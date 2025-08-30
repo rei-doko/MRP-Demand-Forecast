@@ -3,9 +3,9 @@ Demand forecast application for volatile database
 
 Steps on installing the environment.
 
-git clone https://github.com/yourusername/my-python-project.git
+git clone https://github.com/rei-doko/MRP-Demand-Forecast
 
-cd my-python-project
+cd MRP-Demand-Forecast
 
 python -m venv venv
 
