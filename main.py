@@ -40,7 +40,6 @@ def create_database():
     
     create_inventory = """
     CREATE TABLE IF NOT EXISTS inventory(
-        inventory_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
         product_id INTEGER NOT NULL,
         quantity INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (product_id) REFERENCES material_master(product_id) ON DELETE CASCADE
@@ -95,7 +94,11 @@ def inventory():
         cursor.execute("INSERT INTO inventory(product_id, quantity) VALUES (?, ?)",
                        (product_id, quantity))
         connection.commit()
-    inventory_rows = cursor.execute("SELECT * FROM inventory").fetchall()
+    inventory_rows = cursor.execute("""
+        SELECT m.product_id, m.product_name, i.quantity
+        FROM inventory i
+        JOIN material_master m ON i.product_id = m.product_id
+    """).fetchall()
     connection.close()
     return render_template("inventory.html", inventory=inventory_rows)
 
