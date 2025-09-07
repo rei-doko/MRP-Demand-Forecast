@@ -54,8 +54,8 @@ def create_database():
         child_product_id INTEGER NOT NULL,
         quantity_required INTEGER NOT NULL,
         FOREIGN KEY (parent_product_id) REFERENCES material_master(product_id) ON DELETE CASCADE,
-        FOREIGN KEY (child_product_id) REFERENCES material_master(product_id) ON DELETE CASCADE,
-    )
+        FOREIGN KEY (child_product_id) REFERENCES material_master(product_id) ON DELETE CASCADE
+        );
     """
 
     cursor.execute(create_material_master)
@@ -67,84 +67,54 @@ def create_database():
     
     return
 
-create_database()
+create_database()    
 
-def material_master_insert(product_id, product_name):
+@app.route("/materials", methods=["GET", "POST"])
+def material_master():
     connection = sqlite3.connect(db_path)
+    connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
-    cursor.execute("PRAGMA foreign_keys = ON")
-    try:
-        cursor.execute("""
-         INSERT INTO material_master(product_id, product_name)
-        VALUES (?, ?)                  
-        """, (product_id, product_name))
+    if request.method == "POST":
+        product_id = int(request.form["product_id"])
+        product_name = str(request.form["product_name"])
+        cursor.execute("INSERT OR IGNORE INTO material_master(product_id, product_name) VALUES (?, ?)",
+                       (product_id, product_name))
         connection.commit()
-        print(f"Added {product_name} with ID {product_id} to material_master.")
-    except sqlite3.IntegrityError as e:
-        print(f"Error adding product: {e}")
-    finally:
-        connection.close()
-
-def inventory_insert(product_id, quantity):
+    materials_rows = cursor.execute("SELECT * FROM material_master").fetchall()
+    connection.close()
+    return render_template("materials_master.html", materials=materials_rows)
+        
+@app.route("/inventory", methods=["GET", "POST"])
+def inventory():
     connection = sqlite3.connect(db_path)
+    connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
-    cursor.execute("PRAGMA foreign_keys = ON")
-    try:
-        cursor.execute("""
-            INSERT INTO inventory(product_id, quantity)
-            VALUES (?, ?)
-        """, (product_id, quantity))
+    if request.method == "POST":
+        product_id = int(request.form["product_id"])
+        quantity = int(request.form["quantity"])
+        cursor.execute("INSERT INTO inventory(product_id, quantity) VALUES (?, ?)",
+                       (product_id, quantity))
         connection.commit()
-    except sqlite3.IntegrityError as e:
-        print(f"Error adding product: {e}")
-    finally:
-        connection.close()
+    inventory_rows = cursor.execute("SELECT * FROM inventory").fetchall()
+    connection.close()
+    return render_template("inventory.html", inventory=inventory_rows)
 
-def bill_of_materials_insert(parent_id, child_id, quantity_required):
+@app.route("/bom", methods=["GET", "POST"])
+def bom():
     connection = sqlite3.connect(db_path)
+    connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
-    cursor.execute("PRAGMA foreign_keys = ON")
-    try:
-        cursor.execute("""
-            INSERT INTO bom(parent_product_id, child_product_id, quantity_required)
-            VALUES (?, ?, ?)
-        """, (parent_id, child_id, quantity_required))
+    if request.method == "POST":
+        parent_id = int(request.form["parent_id"])
+        child_id = int(request.form["child_id"])
+        quantity_required = int(request.form["quantity_required"])
+        cursor.execute("""INSERT INTO bom(parent_product_id, child_product_id, quantity_required)
+                          VALUES (?, ?, ?)""",
+                       (parent_id, child_id, quantity_required))
         connection.commit()
-        print(f"Added BOM entry: parent {parent_id}, child {child_id}, quantity {quantity_required}.")
-    except sqlite3.IntegrityError as e:
-        print(f"Error adding product: {e}")
-    finally:
-        connection.close()
-
-@app.route('/main')
-def main():
-    print("Welcome! Enter data into database. \n")
-    while True:
-        print("\n Choose action:")
-        print("1 - Add product to material_master")
-        print("2 - Add inventory")
-        print("3 - Add BOM entry")
-        print("q - Quit")
-
-        choice = input("Enter choice: ").strip().lower()
-        if choice == '1':
-            product_id = int(input("Enter product ID (integer): "))
-            product_name = input("Enter product name: ").strip()
-            material_master_insert(product_id, product_name)
-        elif choice == '2':
-            product_id = int(input("Enter product ID (must exist in material_master): "))
-            quantity = int(input("Enter quantity: "))
-            inventory_insert(product_id, quantity)
-        elif choice == '3':
-            parent_id = int(input("Enter parent product ID: "))
-            child_id = int(input("Enter child product ID: "))
-            quantity_required = int(input("Enter quantity required: "))
-            bill_of_materials_insert(parent_id, child_id, quantity_required)
-        elif choice == 'q':
-            print("Goodbye!")
-            break
-        else:
-            print("Invalid choice, try again.")
+    bom_rows = cursor.execute("SELECT * FROM bom").fetchall()
+    connection.close()
+    return render_template("bom.html", bom=bom_rows)
 
 if __name__ == "__main__":
     app.run(debug=True)

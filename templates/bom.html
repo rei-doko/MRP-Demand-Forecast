@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Bill of Materials</h2>
+
+<form method="post" class="mb-4">
+    <div class="mb-3">
+        <label class="form-label">Parent Product ID</label>
+        <input type="number" name="parent_id" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Child Product ID</label>
+        <input type="number" name="child_id" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Quantity Required</label>
+        <input type="number" name="quantity_required" class="form-control" required>
+    </div>
+    <button type="submit" class="btn btn-success">ADD BOM</button>
+</form>
+
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>BOM ID</th>
+            <th>Parent ID</th>
+            <th>Child ID</th>
+            <th>Quantity Required</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for b in bom %}
+            <tr>
+                <td>{{ b['bom_id'] }}</td>
+                <td>{{ b['parent_product_id'] }}</td>
+                <td>{{ b['child_product_id'] }}</td>
+                <td>{{ b['quantity_required'] }}</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}
