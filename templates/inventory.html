@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Inventory</h2>
+
+<form method="post" class="mb-4">
+    <div class="mb-3">
+        <label class="form-label">Product ID</label>
+        <input type="number" name="product_id" class="form-control" required>
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Quantity</label>
+        <input type="number" name="quantity" class="form-control" required>
+    </div>
+    <button type="submit" class="btn btn-success">Add Inventory</button>
+</form>
+
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Product ID</th>
+            <th>Product Name</th>
+            <th>Quantity</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for i in inventory %}
+            <tr>
+                <td>{{ i['product_id'] }}</td>
+                <td>{{ i['product_name'] }}</td>
+                <td>{{ i['quantity'] }}</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% endblock %}

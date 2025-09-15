@@ -12,12 +12,158 @@ import os
 app = Flask(__name__)
 gui = flaskwebgui.FlaskUI(app=app, server="flask", width=1920, height=1080)
 
+# define folder and file
+db_folder = os.path.join(app.root_path, "data")
+os.makedirs(db_folder, exist_ok=True)
+db_path = os.path.join(db_folder, "database.db")
+
 @app.route("/")
 def index():
     return render_template("index.html")
 
-if __name__ == "__main__":
-    #app.run(debug=True)
-    gui.run()
+def create_database():
+    # define connection and cursor
+    connection = sqlite3.connect(db_path)
+    cursor = connection.cursor()
 
-#test development branch
+    # enable foreign key support
+    cursor.execute("PRAGMA foreign_keys = ON")
+
+    # create tables
+
+    create_material_master = """
+    CREATE TABLE IF NOT EXISTS material_master(
+        product_id INTEGER PRIMARY KEY UNIQUE NOT NULL,
+        product_name TEXT NOT NULL
+        );
+    """
+    
+    create_inventory = """
+    CREATE TABLE IF NOT EXISTS inventory(
+        product_id INTEGER NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (product_id) REFERENCES material_master(product_id) ON DELETE CASCADE
+        );
+    """
+
+    create_bill_of_materials = """
+    CREATE TABLE IF NOT EXISTS bom(
+        bom_id INTEGER NOT NULL,
+        parent_product_id INTEGER NOT NULL,
+        child_product_id INTEGER NOT NULL,
+        quantity_required INTEGER NOT NULL,
+        FOREIGN KEY (parent_product_id) REFERENCES material_master(product_id) ON DELETE CASCADE,
+        FOREIGN KEY (child_product_id) REFERENCES material_master(product_id) ON DELETE CASCADE
+        );
+    """
+
+    cursor.execute(create_material_master)
+    cursor.execute(create_inventory)
+    cursor.execute(create_bill_of_materials)
+
+    connection.commit()
+    connection.close()
+
+create_database()    
+
+@app.route("/materials", methods=["GET", "POST"])
+def material_master():
+    connection = sqlite3.connect(db_path)
+    connection.row_factory = sqlite3.Row
+    cursor = connection.cursor()
+
+    if request.method == "POST":
+        product_id = int(request.form["product_id"])
+        product_name = str(request.form["product_name"])
+        cursor.execute("INSERT OR IGNORE INTO material_master(product_id, product_name) VALUES (?, ?)",
+                       (product_id, product_name))
+        connection.commit()
+
+    materials_rows = cursor.execute("SELECT * FROM material_master").fetchall()
+    connection.close()
+    return render_template("materials_master.html", materials=materials_rows)
+        
+@app.route("/inventory", methods=["GET", "POST"])
+def inventory():
+    connection = sqlite3.connect(db_path)
+    connection.row_factory = sqlite3.Row
+    cursor = connection.cursor()
+
+    if request.method == "POST":
+        product_id = int(request.form["product_id"])
+        quantity = int(request.form["quantity"])
+        cursor.execute("INSERT INTO inventory(product_id, quantity) VALUES (?, ?)",
+                       (product_id, quantity))
+        connection.commit()
+
+    inventory_rows = cursor.execute("""
+        SELECT m.product_id, m.product_name, i.quantity
+        FROM inventory i
+        JOIN material_master m ON i.product_id = m.product_id
+    """).fetchall()
+
+    connection.close()
+    return render_template("inventory.html", inventory=inventory_rows)
+
+@app.route("/bom", methods=["GET", "POST"])
+def bom():
+    connection = sqlite3.connect(db_path)
+    connection.row_factory = sqlite3.Row
+    cursor = connection.cursor()
+
+    if request.method == "POST":
+        parent_id = int(request.form["parent_id"])
+        child_ids = request.form.getlist("child_id[]")
+        quantities = request.form.getlist("quantity_required[]")
+        
+        cursor.execute("SELECT COALESCE(MAX(bom_id), 0) + 1 FROM bom")
+        new_bom_id = cursor.fetchone()[0]
+
+        for child_id, qty in zip(child_ids, quantities):
+            cursor.execute("""
+                INSERT INTO bom(bom_id, parent_product_id, child_product_id, quantity_required)
+                VALUES (?, ?, ?, ?)
+            """, 
+                (new_bom_id, parent_id, int(child_id), int(qty)),
+            )
+        connection.commit()
+
+    bom_rows = cursor.execute("""
+        SELECT b.bom_id,
+               b.parent_product_id,
+               m_parent.product_name AS parent_name,
+               b.child_product_id,
+               m_child.product_name AS child_name,
+               b.quantity_required
+        FROM bom b
+        JOIN material_master m_parent ON b.parent_product_id = m_parent.product_id
+        JOIN material_master m_child ON b.child_product_id = m_child.product_id
+        ORDER by b.bom_id, b.parent_product_id
+    """).fetchall()
+
+    connection.close()
+
+    grouped_bom = {}
+    for row in bom_rows:
+        bom_key = (row["bom_id"], row["parent_product_id"], row["parent_name"])
+        if bom_key not in grouped_bom:
+           grouped_bom[bom_key] = []
+        grouped_bom[bom_key].append(
+            f"{row['child_product_id']} - {row['child_name']} (x{row['quantity_required']})"
+        ) 
+
+    bom_list = [
+        { 
+            "bom_id": k[0],
+            "parent_product_id": k[1], 
+            "parent_name": k[2], 
+            "children": ", ".join(v)
+        }
+        for k, v in grouped_bom.items()
+    ]
+
+    return render_template("bom.html", bom=bom_list)
+
+if __name__ == "__main__":
+    app.run(debug=True)
+    #gui.run()
