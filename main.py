@@ -159,14 +159,17 @@ def delete_materials():
     if ids_to_delete:
         connection = sqlite3.connect(db_path)
         cursor = connection.cursor()
+        
         # Delete all selected IDs
-        cursor.executemany(
-            "DELETE FROM material_master " \
-            "WHERE product_id = ?", \
-            [(id,) for id in ids_to_delete]
-            )
+        placeholders = ",".join("?" for _ in ids_to_delete)
+        cursor.execute(
+            f"DELETE FROM material_master WHERE product_id IN ({placeholders})",
+            ids_to_delete
+        )
+        
         connection.commit()
         connection.close()
+    
     # Redirect back to material master after deletion
     return redirect("/materials")
 
@@ -220,11 +223,16 @@ def delete_inventory():
         cursor = connection.cursor()
         
         # Delete each selected inventory row
-        for pid in ids_to_delete:
-            cursor.execute("DELETE FROM inventory WHERE product_id = ?", (pid,))
+        placeholders = ",".join("?" for _ in ids_to_delete)
+        cursor.execute(
+            f"DELETE FROM inventory WHERE product_id IN ({placeholders})",
+            ids_to_delete
+        )
 
         connection.commit()
         connection.close()
+
+    # Redirect back to inventory after deletion
     return redirect("/inventory")
 
 @app.route("/bom", methods=["GET", "POST"])
@@ -300,6 +308,26 @@ def bom():
     ]
 
     return render_template("bom.html", bom=bom_list)
+
+@app.route("/bom/delete", methods=["POST"])
+def delete_bom():
+    ids_to_delete = request.form.getlist("delete_ids[]")
+    if ids_to_delete:
+        connection = sqlite3.connect(db_path)
+        cursor = connection.cursor()
+        
+        # Delete all selected bom_id
+        placeholders = ",".join("?" for _ in ids_to_delete)
+        cursor.execute(
+            f"DELETE FROM bom WHERE bom_id IN ({placeholders})",
+            ids_to_delete
+        )
+
+        connection.commit()
+        connection.close()
+
+    # Redirect back to bom after deletion
+    return redirect("/bom")
 
 # Run Flask
 if __name__ == "__main__":

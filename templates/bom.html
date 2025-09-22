@@ -28,24 +28,65 @@
 
 <hr>
 
-<!-- Displays BOM Table -->
-<h2>Current BOM</h2>
-<table class="table table-bordered">
-    <tr>
-        <th>BOM ID</th>
-        <th>Parent (ID - Name)</th>
-        <th>Children (ID - Name with Quantity)</th>
-    </tr>
-    <!-- Loops through all inventory items passed from Flask -->
-    {% for row in bom %}
-    <tr>
-        <!-- Display item details -->
-        <td>{{ row['bom_id'] }}</td>
-        <td>{{ row['parent_product_id'] }} - {{ row['parent_name'] }}</td>
-        <td>{{ row['children'] }}</td>
-    </tr>
-    {% endfor %}
-</table>
+<form method="POST" action="/bom/delete" id="delete-form">
+    <!-- Deletion of Materials -->
+    <button type="submit" form="delete-form" class="btn btn-danger">Delete Selected</button>
+
+    <!-- Displays BOM Table -->
+    <h2>Current BOM</h2>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                    <!-- Checkbox column for selecting rows -->
+                    <th style="width: 1%;"></th>
+                    <th>BOM ID</th>
+                    <th>Parent (ID - Name)</th>
+                    <th>Children (ID - Name with Quantity)</th>
+                </tr>
+        </thead>
+        <tbody>
+            <!-- Loops through all bom items passed from Flask -->
+            {% for row in bom %}
+                <tr>
+                    <!-- Checkbox linked to delete_ids[] -->
+                    <td class="checkbox-cell">
+                        <input type="checkbox" name="delete_ids[]" value="{{ row['bom_id'] }}">
+                    </td>
+                    <!-- Display item details -->
+                    <td>{{ row['bom_id'] }}</td>
+                    <td>{{ row['parent_product_id'] }} - {{ row['parent_name'] }}</td>
+                    <td>{{ row['children'] }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</form>
+<style>
+    /* Remove borders from first column (checkbox column) */
+    table.table-bordered th:first-child,
+    table.table-bordered td:first-child {
+        border-left: none !important;
+        border-right: none !important;
+        border-top: none !important;
+        border-bottom: none !important;
+        background: transparent;
+    }
+    
+    /* Center checkboxes vertically and horizontally */
+    .checkbox-cell {
+        padding: 0 2px;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    /* Style checkboxes (with red accent color for delete) */
+    .checkbox-cell input[type="checkbox"] {
+        margin: 0;
+        width: 16px;
+        height: 16px;
+        accent-color: #dc3545;
+    }
+</style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -74,7 +115,6 @@
             container.appendChild(div)
         });
     });
-
 </script>
 
 {% endblock %}
