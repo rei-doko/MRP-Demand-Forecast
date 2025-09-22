@@ -1,0 +1,25 @@
+/* Remove borders from first column (checkbox column) */
+/* NOT FIXED */
+table.table-bordered th:first-child,
+table.table-bordered td:first-child {
+        border-left: none !important;
+        border-right: none !important;
+        border-top: none !important;
+        border-bottom: none !important;
+        background: transparent;
+}
+    
+/* Center checkboxes vertically and horizontally */
+.checkbox-cell {
+    padding: 0 2px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+/* Style checkboxes (with red accent color for delete) */
+.checkbox-cell input[type="checkbox"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+    accent-color: #dc3545;
+}

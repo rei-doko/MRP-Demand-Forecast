@@ -3,7 +3,7 @@
 <h2>Add BOM</h2>
 
 <!-- Form to Add BOM -->
-<form method="POST">
+<form method="POST" action="{{ url_for('bom') }}">
     <!-- Input for product_id (Must be >= 0) -->
     <label>Parent Product ID:</label>
     <input type="number" name="parent_id" min="0" required><br><br>
@@ -28,7 +28,7 @@
 
 <hr>
 
-<form method="POST" action="/bom/delete" id="delete-form">
+<form method="POST" action="{{ url_for('delete_bom') }}" id="delete-form">
     <!-- Deletion of Materials -->
     <button type="submit" form="delete-form" class="btn btn-danger">Delete Selected</button>
 
@@ -61,32 +61,6 @@
         </tbody>
     </table>
 </form>
-<style>
-    /* Remove borders from first column (checkbox column) */
-    table.table-bordered th:first-child,
-    table.table-bordered td:first-child {
-        border-left: none !important;
-        border-right: none !important;
-        border-top: none !important;
-        border-bottom: none !important;
-        background: transparent;
-    }
-    
-    /* Center checkboxes vertically and horizontally */
-    .checkbox-cell {
-        padding: 0 2px;
-        text-align: center;
-        vertical-align: middle;
-    }
-
-    /* Style checkboxes (with red accent color for delete) */
-    .checkbox-cell input[type="checkbox"] {
-        margin: 0;
-        width: 16px;
-        height: 16px;
-        accent-color: #dc3545;
-    }
-</style>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {

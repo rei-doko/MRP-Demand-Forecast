@@ -1,5 +1,5 @@
 #Import dependencies and libraries
-from flask import Flask, render_template, Response, jsonify, request, redirect
+from flask import Flask, render_template, Response, jsonify, request, redirect, url_for
 from datetime import datetime
 import numpy as py # Currently unused, but available if needed
 import flaskwebgui # GUI mode
@@ -23,51 +23,6 @@ db_path = os.path.join(db_folder, "database.db")
 def index():
     # Renders homepage
     return render_template("index.html")
-
-def create_database():
-    # Creates all required tables if doesn't exist yet
-    connection = sqlite3.connect(db_path)
-    cursor = connection.cursor()
-
-    # Enable foreign key support for SQLite
-    cursor.execute("PRAGMA foreign_keys = ON")
-
-    # Creates material master table for storing all items
-    create_material_master = """
-    CREATE TABLE IF NOT EXISTS material_master(
-        product_id INTEGER PRIMARY KEY UNIQUE NOT NULL,
-        product_name TEXT NOT NULL
-        );
-    """
-    
-    # Creates inventory table for storing quantity per product
-    create_inventory = """
-    CREATE TABLE IF NOT EXISTS inventory(
-        product_id INTEGER NOT NULL,
-        quantity INTEGER NOT NULL DEFAULT 0,
-        FOREIGN KEY (product_id) REFERENCES material_master(product_id) ON DELETE CASCADE
-        );
-    """
-
-    # Creates bill of materials table for storing parent product with multiple children + quantities required
-    create_bill_of_materials = """
-    CREATE TABLE IF NOT EXISTS bom(
-        bom_id INTEGER NOT NULL,
-        parent_product_id INTEGER NOT NULL,
-        child_product_id INTEGER NOT NULL,
-        quantity_required INTEGER NOT NULL,
-        FOREIGN KEY (parent_product_id) REFERENCES material_master(product_id) ON DELETE CASCADE,
-        FOREIGN KEY (child_product_id) REFERENCES material_master(product_id) ON DELETE CASCADE
-        );
-    """
-
-    # Execute creation queries
-    cursor.execute(create_material_master)
-    cursor.execute(create_inventory)
-    cursor.execute(create_bill_of_materials)
-
-    connection.commit()
-    connection.close()
 
 def ensure_database():
     # Create file + folder if missing
@@ -152,7 +107,7 @@ def material_master():
                            )
             connection.commit()
             connection.close()
-            return redirect("/materials")
+            return redirect(url_for("material_master"))
 
     # Fetch all materials for display
     materials_rows = cursor.execute("SELECT * FROM material_master").fetchall()
@@ -178,7 +133,7 @@ def delete_materials():
         connection.close()
     
     # Redirect back to material master after deletion
-    return redirect("/materials")
+    return redirect(url_for("material_master"))
 
 @app.route("/inventory", methods=["GET", "POST"])
 def inventory():
@@ -212,7 +167,7 @@ def inventory():
         
         connection.commit()
         connection.close()
-        return redirect("/inventory")
+        return redirect(url_for("inventory"))
 
     # Fetch inventory with product names
     inventory_rows = cursor.execute("""
@@ -242,7 +197,7 @@ def delete_inventory():
         connection.close()
 
     # Redirect back to inventory after deletion
-    return redirect("/inventory")
+    return redirect(url_for("inventory"))
 
 @app.route("/bom", methods=["GET", "POST"])
 def bom():
@@ -279,7 +234,7 @@ def bom():
             )
         connection.commit()
         connection.close()
-        return redirect("/bom")
+        return redirect(url_for("bom"))
 
     # Fetch BOM table with product names
     bom_rows = cursor.execute("""
@@ -338,9 +293,12 @@ def delete_bom():
         connection.close()
 
     # Redirect back to bom after deletion
-    return redirect("/bom")
+    return redirect(url_for("bom"))
 
 # Run Flask
 if __name__ == "__main__":
-    app.run(debug=True)
-    #gui.run()
+    USE_GUI = False
+    if USE_GUI:
+        gui.run()
+    else:
+        app.run(debug=True)

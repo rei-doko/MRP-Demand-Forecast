@@ -3,7 +3,7 @@
 <h2>Inventory</h2>
 
 <!-- Form to Add Inventory -->
-<form method="post" class="mb-4">
+<form method="post" action="{{ url_for('inventory') }}" class="mb-4">
     <!-- Input for product_id (Must be >= 0) -->
     <div class="mb-3">
         <label class="form-label">Product ID</label>
@@ -21,7 +21,7 @@
 </form>
 
 <!-- Deletion of Materials -->
-<form method="post" action="/inventory/delete" id="delete-form">
+<form method="post" action="{{ url_for('delete_inventory') }}" id="delete-form">
     <button type="submit" class="btn btn-danger mt-2">Delete Selected</button>
 
 <!-- Displays Inventory Table -->
@@ -51,32 +51,5 @@
         {% endfor %}
     </tbody>
 </table>
-
-<style>
-    /* Remove borders from first column (checkbox column) */
-    table.table-bordered th:first-child,
-    table.table-bordered td:first-child {
-        border-left: none !important;
-        border-right: none !important;
-        border-top: none !important;
-        border-bottom: none !important;
-        background: transparent;
-    }
-    
-    /* Center checkboxes vertically and horizontally */
-    .checkbox-cell {
-        padding: 0 2px;
-        text-align: center;
-        vertical-align: middle;
-    }
-
-    /* Style checkboxes (with red accent color for delete) */
-    .checkbox-cell input[type="checkbox"] {
-        margin: 0;
-        width: 16px;
-        height: 16px;
-        accent-color: #dc3545;
-    }
-</style>
 
 {% endblock %}
