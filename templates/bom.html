@@ -2,37 +2,44 @@
 {% block content %}
 <h2>Add BOM</h2>
 
+<!-- Form to Add BOM -->
 <form method="POST">
+    <!-- Input for product_id (Must be >= 0) -->
     <label>Parent Product ID:</label>
-    <input type="number" name="parent_id" required><br><br>
+    <input type="number" name="parent_id" min="0" required><br><br>
 
+    <!-- Input for container for child product_id -->
     <div id="children-container">
+        <!-- Default child row -->
         <div class="child-row d-flex gap-2 align-items-center mb-2">
             <label>Child Product ID:</label>
-            <input type="number" name="child_id[]" required>
+            <input type="number" name="child_id[]" min="0" required>
             <label>Quantity Required:</label>
-            <input type="number" name="quantity_required[]" required>
+            <input type="number" name="quantity_required[]" min="0" required>
             <button type="button" class="btn btn-danger btn-sm remove-child">Remove</button>
         </div>
     </div>
 
+    <!-- Button to add more child rows -->
     <button type="button" id="add-child-btn" class="btn btn-secondary btn-sm">Add Another Child</button><br><br>
-
+    <!-- Submit button to add to BOM -->
     <input type="submit" value="Add BOM" class="btn btn-primary">
 </form>
 
 <hr>
 
+<!-- Displays BOM Table -->
 <h2>Current BOM</h2>
-
 <table class="table table-bordered">
     <tr>
         <th>BOM ID</th>
         <th>Parent (ID - Name)</th>
         <th>Children (ID - Name with Quantity)</th>
     </tr>
+    <!-- Loops through all inventory items passed from Flask -->
     {% for row in bom %}
     <tr>
+        <!-- Display item details -->
         <td>{{ row['bom_id'] }}</td>
         <td>{{ row['parent_product_id'] }} - {{ row['parent_name'] }}</td>
         <td>{{ row['children'] }}</td>
@@ -42,9 +49,10 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const container = document.getElementById('children-container');
-        const addBtn = document.getElementById('add-child-btn');
+        const container = document.getElementById('children-container'); // Child row containter
+        const addBtn = document.getElementById('add-child-btn'); // Add child button
 
+        // Event listener for removing child rows
         container.addEventListener('click', function(e) {
             if (e.target && e.target.matches('button.remove-child')) {
                 const row = e.target.closest('.child-row');
@@ -52,14 +60,15 @@
             }
         });
     
+        // Event listener for adding new child rows
         addBtn.addEventListener('click', function() {
             const div = document.createElement('div');
             div.className = 'child-row d-flex gap-2 align-items-center mb-2';
             div.innerHTML = `
                 <label>Child Product ID:</label>
-                <input type="number" name="child_id[]" required>
+                <input type="number" name="child_id[]" min="0" required>
                 <label>Quantity Required:</label>
-                <input type="number" name="quantity_required[]" required>
+                <input type="number" name="quantity_required[]" min="0" required>
                 <button type="button" class="btn btn-danger btn-sm remove-child">Remove</button>
             `;
             container.appendChild(div)

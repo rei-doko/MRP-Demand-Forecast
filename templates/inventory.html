@@ -2,29 +2,48 @@
 {% block content %}
 <h2>Inventory</h2>
 
+<!-- Form to Add Inventory -->
 <form method="post" class="mb-4">
+    <!-- Input for product_id (Must be >= 0) -->
     <div class="mb-3">
         <label class="form-label">Product ID</label>
-        <input type="number" name="product_id" class="form-control" required>
+        <input type="number" name="product_id" min="0" class="form-control" required>
     </div>
+
+    <!-- Input for quantity (Must be >= 0) -->
     <div class="mb-3">
         <label class="form-label">Quantity</label>
-        <input type="number" name="quantity" class="form-control" required>
+        <input type="number" name="quantity" min="0" class="form-control" required>
     </div>
+    
+    <!-- Submit button to add to Inventory -->
     <button type="submit" class="btn btn-success">Add Inventory</button>
 </form>
 
+<!-- Deletition of Materials -->
+<form method="post" action="/inventory/delete" id="delete-form">
+    <button type="submit" class="btn btn-danger mt-2">Delete Selected</button>
+
+<!-- Displays Inventory Table -->
 <table class="table table-bordered">
     <thead>
         <tr>
+            <!-- Checkbox column for selecting rows -->
+            <th style="width: 1%;"></th>
             <th>Product ID</th>
             <th>Product Name</th>
             <th>Quantity</th>
         </tr>
     </thead>
     <tbody>
+        <!-- Loops through all inventory items passed from Flask -->
         {% for i in inventory %}
             <tr>
+                <!-- Checkbox linked to delete_ids[] --> 
+                <td class="checkbox-cell">
+                    <input type="checkbox" name="delete_ids[]" value="{{ i['product_id'] }}">
+                </td>
+                <!-- Display item details -->
                 <td>{{ i['product_id'] }}</td>
                 <td>{{ i['product_name'] }}</td>
                 <td>{{ i['quantity'] }}</td>
@@ -32,5 +51,32 @@
         {% endfor %}
     </tbody>
 </table>
+
+<style>
+    /* Remove borders from first column (checkbox column) */
+    table.table-bordered th:first-child,
+    table.table-bordered td:first-child {
+        border-left: none !important;
+        border-right: none !important;
+        border-top: none !important;
+        border-bottom: none !important;
+        background: transparent;
+    }
+    
+    /* Center checkboxes vertically and horizontally */
+    .checkbox-cell {
+        padding: 0 2px;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    /* Style checkboxes (with red accent color for delete) */
+    .checkbox-cell input[type="checkbox"] {
+        margin: 0;
+        width: 16px;
+        height: 16px;
+        accent-color: #dc3545;
+    }
+</style>
 
 {% endblock %}

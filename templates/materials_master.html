@@ -2,32 +2,80 @@
 {% block content %}
 <h2>Material Master</h2>
 
+<!-- Addition of Materials -->
 <form method="post" class="mb-4">
     <div>
+        <!-- Input for product_id (Must be >= 0) -->
         <label class="form-label">Product ID</label>
-        <input type="number" name="product_id" class="form-control" required>
+        <!-- min"0" ensures only non-negative integers can be entered -->
+        <input type="number" name="product_id" min="0" class="form-control" required>
     </div>
     <div class="mb-3">
+        <!-- Input for product_name -->
         <label class="form-label">Product Name</label>
         <input type="text" name="product_name" class="form-control" required>
     </div>
+    <!-- Submit button to add to Material Master -->
     <button type="submit" class="btn btn-success">Add Material</button>
 </form>
 
-<table class="table table-bordered">
-    <thead>
-        <tr>
-            <th>Product ID</th>
-            <th>Product Name</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for m in materials %}
+<!-- Deletion of Materials -->
+<form method="post" action="/materials/delete" id="delete-form">
+    <!-- Submit button deletes selected rows -->
+    <button type="submit" class="btn btn-danger mt-2">Delete Selected</button>
+
+<!-- Displaying Table -->
+    <table class="table table-bordered">
+        <thead>
             <tr>
-                <td>{{ m['product_id'] }}</td>
-                <td>{{ m['product_name'] }}</td>
+                <!-- Checkbox column for selecting rows -->
+                <th style="width: 1%;"></th>
+                <th>Product ID</th>
+                <th>Product Name</th>
             </tr>
-        {% endfor %}
-    </tbody>
-</table>
+        </thead>
+        <tbody>
+            <!-- Loops through all Material Master items passed from Flask -->
+            {% for m in materials %}
+                <tr>
+                    <!-- Checkbox linked to delete_ids[] -->
+                    <td class="checkbox-cell">
+                        <input type="checkbox" name="delete_ids[]" value="{{ m['product_id'] }}">
+                    </td>
+                    <!-- Display item details -->
+                    <td>{{ m['product_id'] }}</td>
+                    <td>{{ m['product_name'] }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</form>
+
+<style>
+    /* Remove borders from first column (checkbox column) */
+    table.table-bordered th:first-child,
+    table.table-bordered td:first-child {
+        border-left: none !important;
+        border-right: none !important;
+        border-top: none !important;
+        border-bottom: none !important;
+        background: transparent;
+    }
+    
+    /* Center checkboxes vertically and horizontally */
+    .checkbox-cell {
+        padding: 0 2px;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    /* Style checkboxes (with red accent color for delete) */
+    .checkbox-cell input[type="checkbox"] {
+        margin: 0;
+        width: 16px;
+        height: 16px;
+        accent-color: #dc3545;
+    }
+</style>
+
 {% endblock %}
