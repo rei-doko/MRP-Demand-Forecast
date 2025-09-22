@@ -2,6 +2,13 @@
 {% block content %}
 <h2>Material Master</h2>
 
+<!-- Message -->
+{% if message %}
+<div class="alert alert-danger mt-2" id="msg-box">
+    {{ message }}
+</div>
+{% endif %}
+
 <!-- Addition of Materials -->
 <form method="post" class="mb-4">
     <div>
@@ -77,5 +84,18 @@
         accent-color: #dc3545;
     }
 </style>
+
+<!-- Auto-hide error message -->
+<script>
+    // 5 second timer for fading out message
+    setTimeout(function() {
+        const msgBox = document.getElementById('msg-box');
+        if (msgBox) {
+            msgBox.style.transition = "opacity 1s ease"; // fade
+            msgBox.style.opacity = "0";
+            setTimeout(() => msgBox.remove(), 1000) // Remove after fade
+        }
+    }, 5000); // 5000ms = 5s
+</script>
 
 {% endblock %}

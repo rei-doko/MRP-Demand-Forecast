@@ -69,8 +69,53 @@ def create_database():
     connection.commit()
     connection.close()
 
-# Create tables if not present
-create_database()    
+def ensure_database():
+    # Create file + folder if missing
+    if not os.path.exists(db_path):
+        os.makedirs(db_folder, exist_ok=True)
+        connection = sqlite3.connect(db_path)
+        connection.close()
+
+    # Connectd and ensured tables exist
+    connection = sqlite3.connect(db_path)
+    cursor = connection.cursor()
+
+    cursor.execute("PRAGMA foreign_keys = ON")
+
+    # Material master table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS material_master(
+            product_id INTEGER PRIMARY KEY UNIQUE NOT NULL,
+            product_name TEXT NOT NULL
+        )
+    """)
+
+    # Inventory table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS inventory(
+            product_id INTEGER NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (product_id) REFERENCES material_master(product_id) ON DELETE CASCADE
+        )
+    """)
+
+    # BOM table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS bom(
+            bom_id INTEGER NOT NULL,
+            parent_product_id INTEGER NOT NULL,
+            child_product_id INTEGER NOT NULL,
+            quantity_required INTEGER NOT NULL,
+            FOREIGN KEY (parent_product_id) REFERENCES material_master(product_id) ON DELETE CASCADE,
+            FOREIGN KEY (child_product_id) REFERENCES material_master(product_id) ON DELETE CASCADE
+        )
+    """)
+
+    connection.commit()
+    connection.close()
+
+# Ensure DB and tables exist
+ensure_database()   
 
 @app.route("/materials", methods=["GET", "POST"])
 def material_master():
@@ -78,6 +123,8 @@ def material_master():
     connection = sqlite3.connect(db_path)
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
+
+    message = None
 
     # Adding new material entry
     if request.method == "POST":
@@ -88,16 +135,22 @@ def material_master():
         if product_id < 0:
             return "Product ID cannot be negative", 400 # 400 means bad request
         
-        # Insert material, ignore if duplicate ID exists -> To be changed so that existing product_id cannot be added 
-        cursor.execute("INSERT OR IGNORE INTO material_master(product_id, product_name) VALUES (?, ?)",
-                       (product_id, product_name)
-                       )
-        connection.commit()
+        # Check if product_id exists
+        cursor.execute("SELECT 1 FROM material_master WHERE product_id = ?", (product_id,))
+        exists = cursor.fetchone()
+
+        if exists:
+            message = f"Product ID {product_id} already exists!" # Error message
+        else:
+            cursor.execute("INSERT INTO material_master(product_id, product_name) VALUES (?, ?)", # Insert material
+                                (product_id, product_name)
+                                )
+            connection.commit()
 
     # Fetch all materials for display
     materials_rows = cursor.execute("SELECT * FROM material_master").fetchall()
     connection.close()
-    return render_template("materials_master.html", materials=materials_rows)
+    return render_template("materials_master.html", materials=materials_rows, message=message)
 
 @app.route("/materials/delete", methods=["POST"])
 def delete_materials():
