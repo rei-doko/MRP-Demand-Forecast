@@ -2,32 +2,73 @@
 {% block content %}
 <h2>Material Master</h2>
 
-<form method="post" class="mb-4">
+<!-- Message -->
+{% if message %}
+<div class="alert alert-danger mt-2" id="msg-box">
+    {{ message }}
+</div>
+{% endif %}
+
+<!-- Addition of Materials -->
+<form method="post" action="{{ url_for('material_master') }}" class="mb-4">
     <div>
+        <!-- Input for product_id (Must be >= 0) -->
         <label class="form-label">Product ID</label>
-        <input type="number" name="product_id" class="form-control" required>
+        <!-- min"0" ensures only non-negative integers can be entered -->
+        <input type="number" name="product_id" min="0" class="form-control" required>
     </div>
     <div class="mb-3">
+        <!-- Input for product_name -->
         <label class="form-label">Product Name</label>
         <input type="text" name="product_name" class="form-control" required>
     </div>
+    <!-- Submit button to add to Material Master -->
     <button type="submit" class="btn btn-success">Add Material</button>
 </form>
 
-<table class="table table-bordered">
-    <thead>
-        <tr>
-            <th>Product ID</th>
-            <th>Product Name</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for m in materials %}
+<!-- Deletion of Materials -->
+<form method="post" action="{{ url_for('delete_materials') }}" id="delete-form">
+    <!-- Submit button deletes selected rows -->
+    <button type="submit" class="btn btn-danger mt-2">Delete Selected</button>
+
+<!-- Displaying Table -->
+    <table class="table table-bordered">
+        <thead>
             <tr>
-                <td>{{ m['product_id'] }}</td>
-                <td>{{ m['product_name'] }}</td>
+                <!-- Checkbox column for selecting rows -->
+                <th style="width: 1%;"></th>
+                <th>Product ID</th>
+                <th>Product Name</th>
             </tr>
-        {% endfor %}
-    </tbody>
-</table>
+        </thead>
+        <tbody>
+            <!-- Loops through all Material Master items passed from Flask -->
+            {% for m in materials %}
+                <tr>
+                    <!-- Checkbox linked to delete_ids[] -->
+                    <td class="checkbox-cell">
+                        <input type="checkbox" name="delete_ids[]" value="{{ m['product_id'] }}">
+                    </td>
+                    <!-- Display item details -->
+                    <td>{{ m['product_id'] }}</td>
+                    <td>{{ m['product_name'] }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</form>
+
+<!-- Auto-hide error message -->
+<script>
+    // 5 second timer for fading out message
+    setTimeout(function() {
+        const msgBox = document.getElementById('msg-box');
+        if (msgBox) {
+            msgBox.style.transition = "opacity 1s ease"; // fade
+            msgBox.style.opacity = "0";
+            setTimeout(() => msgBox.remove(), 1000) // Remove after fade
+        }
+    }, 5000); // 5000ms = 5s
+</script>
+
 {% endblock %}
