@@ -12,7 +12,7 @@ import os
 # Initialize Flask app
 app = Flask(__name__)
 # Initialize Flask GUI wrapper
-gui = flaskwebgui.FlaskUI(app=app, server="flask", width=1920, height=1080)
+gui = flaskwebgui.FlaskUI(app=app, server="flask", width=800, height=600)
 
 # Define folder and file path for SQLite database
 db_folder = os.path.join(app.root_path, "data")
@@ -140,12 +140,19 @@ def material_master():
         exists = cursor.fetchone()
 
         if exists:
-            message = f"Product ID {product_id} already exists!" # Error message
+            materials_rows = cursor.execute("SELECT * FROM material_master").fetchall()
+            connection.close()
+            return render_template("materials_master.html",
+                                   materials=materials_rows,
+                                   message=f"Product ID {product_id} already exists!" # Error message
+                                   )
         else:
             cursor.execute("INSERT INTO material_master(product_id, product_name) VALUES (?, ?)", # Insert material
-                                (product_id, product_name)
-                                )
+                           (product_id, product_name)
+                           )
             connection.commit()
+            connection.close()
+            return redirect("/materials")
 
     # Fetch all materials for display
     materials_rows = cursor.execute("SELECT * FROM material_master").fetchall()
@@ -204,6 +211,8 @@ def inventory():
                            )
         
         connection.commit()
+        connection.close()
+        return redirect("/inventory")
 
     # Fetch inventory with product names
     inventory_rows = cursor.execute("""
@@ -269,6 +278,8 @@ def bom():
                 (new_bom_id, parent_id, int(child_id), int(qty)),
             )
         connection.commit()
+        connection.close()
+        return redirect("/bom")
 
     # Fetch BOM table with product names
     bom_rows = cursor.execute("""
