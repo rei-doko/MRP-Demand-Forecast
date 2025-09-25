@@ -75,7 +75,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const forecastDiv = document.getElementById('forecast-output');
-    const productId = "{{ selected_product['product_id'] }}";  // Keep as string to avoid parse issues
+    const productId = ("{{ selected_product['product_id'] }}"); // already works
 
     fetch(`{{ url_for('sales_forecast') }}?product_id=${productId}`)
         .then(response => response.json())
@@ -83,12 +83,17 @@ document.addEventListener('DOMContentLoaded', function() {
             if(data.error){
                 forecastDiv.innerHTML = data.error;
             } else {
+                // Round the forecast values to whole numbers
+                const forecastLatest = data.forecast_for_latest_week !== null ? Math.round(data.forecast_for_latest_week) : "N/A";
+                const errorPercent = data.error_percent_latest_week !== null ? Math.round(data.error_percent_latest_week) : "N/A";
+                const nextWeek = data.next_week_prediction !== null ? Math.round(data.next_week_prediction) : "N/A";
+
                 forecastDiv.innerHTML = `
                     <h5>Forecast (Weighted Moving Average)</h5>
                     <ul>
-                        <li>Predicted latest week: ${data.forecast_for_latest_week !== null ? data.forecast_for_latest_week.toFixed(2) : "N/A"}</li>
-                        <li>Error % latest week: ${data.error_percent_latest_week !== null ? data.error_percent_latest_week.toFixed(2) : "N/A"}%</li>
-                        <li>Next week prediction: ${data.next_week_prediction !== null ? data.next_week_prediction.toFixed(2) : "N/A"}</li>
+                        <li>Predicted latest week (Rounded): ${forecastLatest}</li>
+                        <li>Error % latest week: ${errorPercent}%</li>
+                        <li>Next week prediction (Rounded): ${nextWeek}</li>
                     </ul>
                 `;
             }
