@@ -1,12 +1,8 @@
-#Import dependencies and libraries
+# Import dependencies and libraries
 from flask import Flask, render_template, Response, jsonify, request, redirect, url_for
 from datetime import datetime
-import numpy as py # Currently unused, but available if needed
-import flaskwebgui # GUI mode
+import flaskwebgui  # GUI mode
 import sqlite3
-import pandas as pd # Currently unused, but available if needed
-import math # Currently unused, but available if needed
-import time # Currently unused, but available if needed
 import os
 
 # Initialize Flask app
@@ -31,7 +27,7 @@ def ensure_database():
         connection = sqlite3.connect(db_path)
         connection.close()
 
-    # Connectd and ensured tables exist
+    # Connect and ensure tables exist
     connection = sqlite3.connect(db_path)
     cursor = connection.cursor()
 
@@ -48,7 +44,7 @@ def ensure_database():
     # Inventory table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS inventory(
-            product_id INTEGER NOT NULL,
+            product_id INTEGER PRIMARY KEY,
             quantity INTEGER NOT NULL DEFAULT 0,
             FOREIGN KEY (product_id) REFERENCES material_master(product_id) ON DELETE CASCADE
         )
@@ -77,6 +73,16 @@ def ensure_database():
         )
     """)
 
+    # Trigger to auto-create inventory row when material is added
+    cursor.execute("""
+        CREATE TRIGGER IF NOT EXISTS create_inventory_after_material
+        AFTER INSERT ON material_master
+        BEGIN
+            INSERT INTO inventory(product_id, quantity)
+            VALUES (NEW.product_id, 0);
+        END;
+    """)
+
     connection.commit()
     connection.close()
 
@@ -87,6 +93,7 @@ ensure_database()
 def material_master():
     # View and add materials to the material master
     connection = sqlite3.connect(db_path)
+    connection.execute("PRAGMA foreign_keys = ON")
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
 
@@ -99,7 +106,7 @@ def material_master():
         
         # ID must be >= 0
         if product_id < 0:
-            return "Product ID cannot be negative", 400 # 400 means bad request
+            return "Product ID cannot be negative", 400
         
         # Check if product_id exists
         cursor.execute("SELECT 1 FROM material_master WHERE product_id = ?", (product_id,))
@@ -110,12 +117,15 @@ def material_master():
             connection.close()
             return render_template("materials_master.html",
                                    materials=materials_rows,
-                                   message=f"Product ID {product_id} already exists!" # Error message
+                                   message=f"Product ID {product_id} already exists!"
                                    )
         else:
-            cursor.execute("INSERT INTO material_master(product_id, product_name) VALUES (?, ?)", # Insert material
-                           (product_id, product_name)
-                           )
+            # Insert into material_master (inventory row will be auto-created by trigger)
+            cursor.execute(
+                "INSERT INTO material_master(product_id, product_name) VALUES (?, ?)",
+                (product_id, product_name)
+            )
+            
             connection.commit()
             connection.close()
             return redirect(url_for("material_master"))
@@ -127,13 +137,12 @@ def material_master():
 
 @app.route("/materials/delete", methods=["POST"])
 def delete_materials():
-    # Delete selected materials from material master
     ids_to_delete = request.form.getlist("delete_ids[]")
     if ids_to_delete:
         connection = sqlite3.connect(db_path)
+        connection.execute("PRAGMA foreign_keys = ON")
         cursor = connection.cursor()
         
-        # Delete all selected IDs
         placeholders = ",".join("?" for _ in ids_to_delete)
         cursor.execute(
             f"DELETE FROM material_master WHERE product_id IN ({placeholders})",
@@ -143,87 +152,66 @@ def delete_materials():
         connection.commit()
         connection.close()
     
-    # Redirect back to material master after deletion
     return redirect(url_for("material_master"))
 
 @app.route("/inventory", methods=["GET", "POST"])
 def inventory():
-    # View, add, and update inventory
     connection = sqlite3.connect(db_path)
+    connection.execute("PRAGMA foreign_keys = ON")
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
 
-    # Adding new inventory entry
+    message = request.args.get("message")
+
     if request.method == "POST":
-        product_id = int(request.form["product_id"])
-        quantity = int(request.form["quantity"])
-        
-        # ID and quantity must be >= 0
-        if product_id < 0 or quantity < 0:
-            return "Product ID and quantity cannot be negative!", 400 # 400 means bad request
-        
-        # Check if the product already exists in inventory
-        cursor.execute("SELECT quantity FROM inventory WHERE product_id = ?", (product_id,))
-        result = cursor.fetchone()
+        updates = {}
+        for key, value in request.form.items():
+            if key.startswith("update_quantities["):
+                pid = int(key.split("[")[1].split("]")[0])
+                if value.strip() == "":
+                    continue
+                qty = int(value)
+                if qty < 0:
+                    continue
+                updates[pid] = qty
 
-        if result: 
-            # Product exists, update quantity
-            new_quantity = result["quantity"] + quantity
-            cursor.execute("UPDATE inventory SET quantity = ? WHERE product_id = ?", (new_quantity, product_id))
-        else: 
-            # Product does not exist, create insert new row
-            cursor.execute("INSERT INTO inventory(product_id, quantity) VALUES (?, ?)",
-                           (product_id, quantity)
-                           )
-        
-        connection.commit()
-        connection.close()
-        return redirect(url_for("inventory"))
+        for pid, qty in updates.items():
+            cursor.execute(
+                "UPDATE inventory SET quantity = ? WHERE product_id = ?",
+                (qty, pid)
+            )
 
-    # Fetch inventory with product names
-    inventory_rows = cursor.execute("""
-        SELECT m.product_id, m.product_name, i.quantity
+        if updates:
+            connection.commit()
+            connection.close()
+            return redirect(url_for("inventory", message="Inventory updated successfully."))
+        else:
+            connection.close()
+            return redirect(url_for("inventory", message="No valid updates provided."))
+
+    cursor.execute("""
+        SELECT i.product_id, m.product_name, i.quantity
         FROM inventory i
         JOIN material_master m ON i.product_id = m.product_id
-    """).fetchall()
-
+        ORDER BY i.product_id
+    """)
+    inventory_data = cursor.fetchall()
     connection.close()
-    return render_template("inventory.html", inventory=inventory_rows)
 
-@app.route("/inventory/delete", methods=["POST"])
-def delete_inventory():
-    ids_to_delete = request.form.getlist("delete_ids[]")
-    if ids_to_delete:
-        connection = sqlite3.connect(db_path)
-        cursor = connection.cursor()
-        
-        # Delete each selected inventory row
-        placeholders = ",".join("?" for _ in ids_to_delete)
-        cursor.execute(
-            f"DELETE FROM inventory WHERE product_id IN ({placeholders})",
-            ids_to_delete
-        )
-
-        connection.commit()
-        connection.close()
-
-    # Redirect back to inventory after deletion
-    return redirect(url_for("inventory"))
+    return render_template("inventory.html", inventory=inventory_data, message=message)
 
 @app.route("/bom", methods=["GET", "POST"])
 def bom():
-    # View and add BOM entries
     connection = sqlite3.connect(db_path)
+    connection.execute("PRAGMA foreign_keys = ON")
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
 
-    # Adding new BOM entry
     if request.method == "POST":
         parent_id = int(request.form["parent_id"])
         child_ids = request.form.getlist("child_id[]")
         quantities = request.form.getlist("quantity_required[]")
         
-        # IDs and quantities must be >= 0
         if parent_id < 0:
             return "Parent ID cannot be negative", 400
         
@@ -231,11 +219,9 @@ def bom():
             if int(child_id) < 0 or int(qty) < 0:
                 return "Child IDs and quantities cannot be negative", 400
 
-        # Generate new BOM ID
         cursor.execute("SELECT COALESCE(MAX(bom_id), 0) + 1 FROM bom")
         new_bom_id = cursor.fetchone()[0]
 
-        # Insert each child for the new BOM
         for child_id, qty in zip(child_ids, quantities):
             cursor.execute("""
                 INSERT INTO bom(bom_id, parent_product_id, child_product_id, quantity_required)
@@ -247,7 +233,6 @@ def bom():
         connection.close()
         return redirect(url_for("bom"))
 
-    # Fetch BOM table with product names
     bom_rows = cursor.execute("""
         SELECT b.bom_id,
                b.parent_product_id,
@@ -263,17 +248,15 @@ def bom():
 
     connection.close()
 
-    # Group children under each BOM ID
     grouped_bom = {}
     for row in bom_rows:
         bom_key = (row["bom_id"], row["parent_product_id"], row["parent_name"])
         if bom_key not in grouped_bom:
-           grouped_bom[bom_key] = []
+            grouped_bom[bom_key] = []
         grouped_bom[bom_key].append(
             f"{row['child_product_id']} - {row['child_name']} (x{row['quantity_required']})"
         ) 
 
-    # Format BOM list for template
     bom_list = [
         { 
             "bom_id": k[0],
@@ -291,9 +274,10 @@ def delete_bom():
     ids_to_delete = request.form.getlist("delete_ids[]")
     if ids_to_delete:
         connection = sqlite3.connect(db_path)
+        connection.execute("PRAGMA foreign_keys = ON")
         cursor = connection.cursor()
+
         
-        # Delete all selected bom_id
         placeholders = ",".join("?" for _ in ids_to_delete)
         cursor.execute(
             f"DELETE FROM bom WHERE bom_id IN ({placeholders})",
@@ -303,12 +287,12 @@ def delete_bom():
         connection.commit()
         connection.close()
 
-    # Redirect back to bom after deletion
     return redirect(url_for("bom"))
 
 @app.route("/sales", methods=["GET", "POST"])
 def sales():
     connection = sqlite3.connect(db_path)
+    connection.execute("PRAGMA foreign_keys = ON")
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
 
@@ -316,7 +300,6 @@ def sales():
     selected_product = None
     weekly_sales = []
 
-    # Update Weekly Sales
     if request.method == "POST":
         try:
             product_id = int(request.form["product_id"])
@@ -328,7 +311,6 @@ def sales():
             product_id = None
 
         if product_id is not None:
-            # Verify product exists
             cursor.execute(
                 "SELECT * FROM material_master WHERE product_id = ?", (product_id,)
             )
@@ -336,7 +318,6 @@ def sales():
             if not product_row:
                 message = f"Product ID {product_id} does not exist."
             else:
-                # Insert or update weekly sales
                 cursor.execute("""
                     INSERT INTO sales(product_id, week, amount)
                     VALUES (?, ?, ?)
@@ -344,10 +325,8 @@ def sales():
                 """, (product_id, week_number, week_sales_amount))
                 connection.commit()
                 connection.close()
-                # Redirect GET to avoid resubmission
                 return redirect(url_for("sales", product_id=product_id))
 
-    # Display Folder
     selected_product_id = request.args.get("product_id", type=int)
     if selected_product_id:
         cursor.execute(
@@ -361,7 +340,6 @@ def sales():
             )
             weekly_sales = cursor.fetchall()
 
-    # Load all products for dropdown
     cursor.execute("SELECT * FROM material_master ORDER BY product_id")
     products = cursor.fetchall()
     connection.close()
@@ -376,15 +354,14 @@ def sales():
 
 @app.route("/sales/add", methods=["POST"])
 def add_sales():
-    # Add/Update a weekly sales entry for a specific product
     product_id = int(request.form["product_id"])
     week = int(request.form["week"])
     amount = int(request.form["amount"])
 
     connection = sqlite3.connect(db_path)
+    connection.execute("PRAGMA foreign_keys = ON")
     cursor = connection.cursor()
     
-    # Insert new sales entry or update existing one for same product and week
     cursor.execute("""
         INSERT INTO sales(product_id, week, amount)
         VALUES (?, ?, ?)
@@ -394,7 +371,6 @@ def add_sales():
     connection.commit()
     connection.close()
 
-    # Redirect to sales folder
     return redirect(url_for("sales"))
 
 @app.route("/sales/delete", methods=["POST"])
@@ -403,13 +379,12 @@ def delete_sales():
     delete_weeks = request.form.getlist("delete_weeks[]")
 
     if not product_id or not delete_weeks:
-        # Redirect back to same folder if nothing selected
         return redirect(url_for("sales", product_id=product_id))
 
     connection = sqlite3.connect(db_path)
+    connection.execute("PRAGMA foreign_keys = ON")
     cursor = connection.cursor()
 
-    # Delete selected weeks for this product
     placeholders = ",".join("?" for _ in delete_weeks)
     cursor.execute(
         f"DELETE FROM sales WHERE product_id = ? AND week IN ({placeholders})",
@@ -419,31 +394,31 @@ def delete_sales():
     connection.commit()
     connection.close()
 
-    # Redirect to same folder after deletion (GET)
     return redirect(url_for("sales", product_id=product_id))
 
-# Helper to get all products
 def get_products():
     connection = sqlite3.connect(db_path)
+    connection.execute("PRAGMA foreign_keys = ON")
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
+    
     cursor.execute("SELECT * FROM material_master ORDER BY product_id")
     products = cursor.fetchall()
+    
     connection.close()
     return products
 
 @app.route("/sales/forecast", methods=["GET"])
 def sales_forecast():
-    # Get product ID from query parameters
     product_id = request.args.get("product_id", type=int)
     if product_id is None:
         return jsonify({"error": "Missing product_id"}), 400
 
     connection = sqlite3.connect(db_path)
+    connection.execute("PRAGMA foreign_keys = ON")
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
 
-    # Fetch sales data for this product ordered by week
     cursor.execute(
         "SELECT week, amount FROM sales WHERE product_id = ? ORDER BY week",
         (product_id,)
@@ -453,36 +428,31 @@ def sales_forecast():
 
     connection.close()
 
-    # Weighted Moving Average (latest week has highest weight)
     def weighted_moving_average(values):
         n = len(values)
         if n == 0:
             return None
-        weights = list(range(1, n + 1))  # chronological weights: oldest=1, latest=n
-        weighted_sum = sum(sales_amount * weight for sales_amount, weight in zip(values, weights))
+        weights = list(range(1, n + 1))
+        weighted_sum = sum(s * w for s, w in zip(values, weights))
         return weighted_sum / sum(weights)
 
-    # sMAPE (Symmetric Mean Absolute Percentage Error)
     def smape(actual_values, forecasted_values):
         errors = []
-        for actual_value, forecast_value in zip(actual_values, forecasted_values):
-            denominator = (abs(actual_value) + abs(forecast_value)) / 2
+        for actual, forecast in zip(actual_values, forecasted_values):
+            denominator = (abs(actual) + abs(forecast)) / 2
             if denominator == 0:
                 continue
-            errors.append(abs(actual_value - forecast_value) / denominator)
+            errors.append(abs(actual - forecast) / denominator)
         return (sum(errors) / len(errors) * 100) if errors else None
 
-    # Generate one-step forecasts for all weeks except the first
     forecasted_values = []
     if len(weekly_amounts) > 1:
         for i in range(1, len(weekly_amounts)):
             forecasted_values.append(weighted_moving_average(weekly_amounts[:i]))
-        # Compute sMAPE across all forecasted weeks
         smape_value = smape(weekly_amounts[1:], forecasted_values)
     else:
         smape_value = None
 
-    # Predict next week using all available data
     next_week_prediction = weighted_moving_average(weekly_amounts) if weekly_amounts else None
 
     return jsonify({
@@ -490,7 +460,6 @@ def sales_forecast():
         "next_week_prediction": next_week_prediction
     })
 
-# Run Flask
 if __name__ == "__main__":
     USE_GUI = False
     if USE_GUI:
