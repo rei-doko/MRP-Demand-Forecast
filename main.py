@@ -314,25 +314,26 @@ def sales():
 
     message = None
     selected_product = None
-    sales_data = []
+    weekly_sales = []
 
-    # Step 1: Handle POST for adding/updating sales
+    # Update Weekly Sales
     if request.method == "POST":
         try:
             product_id = int(request.form["product_id"])
-            week = int(request.form["week"])
-            amount = int(request.form["amount"])
+            week_number = int(request.form["week"])
+            week_sales_amount = int(request.form["amount"])
         except (KeyError, ValueError):
             connection.close()
             message = "All fields are required and must be valid numbers!"
             product_id = None
 
         if product_id is not None:
-            # Check product exists in material master
-            cursor.execute("SELECT * FROM material_master WHERE product_id = ?", (product_id,))
+            # Verify product exists
+            cursor.execute(
+                "SELECT * FROM material_master WHERE product_id = ?", (product_id,)
+            )
             product_row = cursor.fetchone()
             if not product_row:
-                connection.close()
                 message = f"Product ID {product_id} does not exist."
             else:
                 # Insert or update weekly sales
@@ -340,48 +341,60 @@ def sales():
                     INSERT INTO sales(product_id, week, amount)
                     VALUES (?, ?, ?)
                     ON CONFLICT(product_id, week) DO UPDATE SET amount=excluded.amount
-                """, (product_id, week, amount))
+                """, (product_id, week_number, week_sales_amount))
                 connection.commit()
+                connection.close()
+                # Redirect GET to avoid resubmission
                 return redirect(url_for("sales", product_id=product_id))
 
-    # Step 2: Handle GET to display selected folder
-    product_id_param = request.args.get("product_id", type=int)
-    if product_id_param:
-        cursor.execute("SELECT * FROM material_master WHERE product_id = ?", (product_id_param,))
+    # Display Folder
+    selected_product_id = request.args.get("product_id", type=int)
+    if selected_product_id:
+        cursor.execute(
+            "SELECT * FROM material_master WHERE product_id = ?", (selected_product_id,)
+        )
         selected_product = cursor.fetchone()
         if selected_product:
-            cursor.execute("SELECT week, amount FROM sales WHERE product_id = ? ORDER BY week", (product_id_param,))
-            sales_data = cursor.fetchall()
+            cursor.execute(
+                "SELECT week, amount FROM sales WHERE product_id = ? ORDER BY week",
+                (selected_product_id,)
+            )
+            weekly_sales = cursor.fetchall()
 
-    # Fetch all products for dropdown
+    # Load all products for dropdown
     cursor.execute("SELECT * FROM material_master ORDER BY product_id")
     products = cursor.fetchall()
-
     connection.close()
 
     return render_template(
         "sales.html",
         products=products,
         selected_product=selected_product,
-        sales_data=sales_data,
+        weekly_sales=weekly_sales,
         message=message
     )
 
 @app.route("/sales/add", methods=["POST"])
 def add_sales():
+    # Add/Update a weekly sales entry for a specific product
     product_id = int(request.form["product_id"])
     week = int(request.form["week"])
     amount = int(request.form["amount"])
 
     connection = sqlite3.connect(db_path)
     cursor = connection.cursor()
+    
+    # Insert new sales entry or update existing one for same product and week
     cursor.execute("""
         INSERT INTO sales(product_id, week, amount)
         VALUES (?, ?, ?)
         ON CONFLICT(product_id, week) DO UPDATE SET amount=excluded.amount
     """, (product_id, week, amount))
+    
     connection.commit()
     connection.close()
+
+    # Redirect to sales folder
     return redirect(url_for("sales"))
 
 @app.route("/sales/delete", methods=["POST"])
@@ -418,6 +431,64 @@ def get_products():
     products = cursor.fetchall()
     connection.close()
     return products
+
+@app.route("/sales/forecast", methods=["GET"])
+def sales_forecast():
+    # Get product ID from query parameters
+    product_id = request.args.get("product_id", type=int)
+    if product_id is None:
+        return jsonify({"error": "Missing product_id"}), 400
+
+    connection = sqlite3.connect(db_path)
+    connection.row_factory = sqlite3.Row
+    cursor = connection.cursor()
+
+    # Fetch sales data for this product ordered by week
+    cursor.execute(
+        "SELECT week, amount FROM sales WHERE product_id = ? ORDER BY week",
+        (product_id,)
+    )
+    sales_rows = cursor.fetchall()
+    weekly_amounts = [row["amount"] for row in sales_rows]
+
+    connection.close()
+
+    # Weighted Moving Average (latest week has highest weight)
+    def weighted_moving_average(values):
+        n = len(values)
+        if n == 0:
+            return None
+        weights = list(range(1, n + 1))  # chronological weights: oldest=1, latest=n
+        weighted_sum = sum(sales_amount * weight for sales_amount, weight in zip(values, weights))
+        return weighted_sum / sum(weights)
+
+    # sMAPE (Symmetric Mean Absolute Percentage Error)
+    def smape(actual_values, forecasted_values):
+        errors = []
+        for actual_value, forecast_value in zip(actual_values, forecasted_values):
+            denominator = (abs(actual_value) + abs(forecast_value)) / 2
+            if denominator == 0:
+                continue
+            errors.append(abs(actual_value - forecast_value) / denominator)
+        return (sum(errors) / len(errors) * 100) if errors else None
+
+    # Generate one-step forecasts for all weeks except the first
+    forecasted_values = []
+    if len(weekly_amounts) > 1:
+        for i in range(1, len(weekly_amounts)):
+            forecasted_values.append(weighted_moving_average(weekly_amounts[:i]))
+        # Compute sMAPE across all forecasted weeks
+        smape_value = smape(weekly_amounts[1:], forecasted_values)
+    else:
+        smape_value = None
+
+    # Predict next week using all available data
+    next_week_prediction = weighted_moving_average(weekly_amounts) if weekly_amounts else None
+
+    return jsonify({
+        "sMAPE_percent": smape_value,
+        "next_week_prediction": next_week_prediction
+    })
 
 # Run Flask
 if __name__ == "__main__":
