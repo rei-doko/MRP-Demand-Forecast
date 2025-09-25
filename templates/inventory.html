@@ -2,54 +2,51 @@
 {% block content %}
 <h2>Inventory</h2>
 
-<!-- Form to Add Inventory -->
-<form method="post" action="{{ url_for('inventory') }}" class="mb-4">
-    <!-- Input for product_id (Must be >= 0) -->
-    <div class="mb-3">
-        <label class="form-label">Product ID</label>
-        <input type="number" name="product_id" min="0" class="form-control" required>
-    </div>
+<!-- Display message if exists -->
+{% if message %}
+    <div class="alert alert-info" id="msg-box">{{ message }}</div>
+{% endif %}
 
-    <!-- Input for quantity (Must be >= 0) -->
-    <div class="mb-3">
-        <label class="form-label">Quantity</label>
-        <input type="number" name="quantity" min="0" class="form-control" required>
-    </div>
-    
-    <!-- Submit button to add to Inventory -->
-    <button type="submit" class="btn btn-success">Add Inventory</button>
+<!-- Centralized Update Form -->
+<form method="POST" action="{{ url_for('inventory') }}">
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Product ID</th>
+                <th>Product Name</th>
+                <th>Current Quantity</th>
+                <th>
+                    <button type="submit" class="btn btn-success btn-sm mt-1">Update</button>
+                </th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in inventory %}
+            <tr>
+                <td>{{ item['product_id'] }}</td>
+                <td>{{ item['product_name'] }}</td>
+                <td>{{ item['quantity'] }}</td>
+                <td>
+                    <input type="number" 
+                           name="update_quantities[{{ item['product_id'] }}]" 
+                           min="0" class="form-control" 
+                           placeholder="Enter new value">
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </form>
 
-<!-- Deletion of Materials -->
-<form method="post" action="{{ url_for('delete_inventory') }}" id="delete-form">
-    <button type="submit" class="btn btn-danger mt-2">Delete Selected</button>
-
-<!-- Displays Inventory Table -->
-<table class="table table-bordered">
-    <thead>
-        <tr>
-            <!-- Checkbox column for selecting rows -->
-            <th style="width: 1%;"></th>
-            <th>Product ID</th>
-            <th>Product Name</th>
-            <th>Quantity</th>
-        </tr>
-    </thead>
-    <tbody>
-        <!-- Loops through all inventory items passed from Flask -->
-        {% for i in inventory %}
-            <tr>
-                <!-- Checkbox linked to delete_ids[] --> 
-                <td class="checkbox-cell">
-                    <input type="checkbox" name="delete_ids[]" value="{{ i['product_id'] }}">
-                </td>
-                <!-- Display item details -->
-                <td>{{ i['product_id'] }}</td>
-                <td>{{ i['product_name'] }}</td>
-                <td>{{ i['quantity'] }}</td>
-            </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
+<script>
+    // Auto-hide the message box after 5 seconds
+    document.addEventListener("DOMContentLoaded", function() {
+        const msgBox = document.getElementById("msg-box");
+        if (msgBox) {
+            setTimeout(() => {
+                msgBox.style.display = "none";
+            }, 5000);
+        }
+    });
+</script>
 {% endblock %}
