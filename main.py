@@ -422,7 +422,7 @@ def delete_sales():
     # Redirect to same folder after deletion (GET)
     return redirect(url_for("sales", product_id=product_id))
 
-# Helper to get all products -- WHAT DOES THIS DO
+# Helper to get all products
 def get_products():
     connection = sqlite3.connect(db_path)
     connection.row_factory = sqlite3.Row
@@ -443,7 +443,7 @@ def sales_forecast():
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
 
-    # Fetch all sales for the product ordered by week
+    # Fetch sales data for this product ordered by week
     cursor.execute(
         "SELECT week, amount FROM sales WHERE product_id = ? ORDER BY week",
         (product_id,)
@@ -453,38 +453,40 @@ def sales_forecast():
 
     connection.close()
 
-    # Helper: weighted moving average (latest week has highest weight)
+    # Weighted Moving Average (latest week has highest weight)
     def weighted_moving_average(values):
         n = len(values)
         if n == 0:
             return None
         weights = list(range(1, n + 1))  # chronological weights: oldest=1, latest=n
-        weighted_sum = sum(weekly_sale * week_weight for weekly_sale, week_weight in zip(values, weights))
+        weighted_sum = sum(sales_amount * weight for sales_amount, weight in zip(values, weights))
         return weighted_sum / sum(weights)
 
-    # Forecast calculations
+    # sMAPE (Symmetric Mean Absolute Percentage Error)
+    def smape(actual_values, forecasted_values):
+        errors = []
+        for actual_value, forecast_value in zip(actual_values, forecasted_values):
+            denominator = (abs(actual_value) + abs(forecast_value)) / 2
+            if denominator == 0:
+                continue
+            errors.append(abs(actual_value - forecast_value) / denominator)
+        return (sum(errors) / len(errors) * 100) if errors else None
+
+    # Generate one-step forecasts for all weeks except the first
+    forecasted_values = []
     if len(weekly_amounts) > 1:
-        # Test the latest week for accuracy
-        forecast_for_latest_week = weighted_moving_average(weekly_amounts[:-1])
-        actual_latest_week = weekly_amounts[-1]
-        error_percent_latest_week = (
-            abs(actual_latest_week - forecast_for_latest_week) / actual_latest_week * 100
-            if actual_latest_week else None
-        )
-        # Predict next week using all available data
-        next_week_prediction = weighted_moving_average(weekly_amounts)
-    elif len(weekly_amounts) == 1:
-        # Only one week available: cannot test accuracy, can only predict next week
-        forecast_for_latest_week = None
-        error_percent_latest_week = None
-        next_week_prediction = weekly_amounts[0]
+        for i in range(1, len(weekly_amounts)):
+            forecasted_values.append(weighted_moving_average(weekly_amounts[:i]))
+        # Compute sMAPE across all forecasted weeks
+        smape_value = smape(weekly_amounts[1:], forecasted_values)
     else:
-        # No data
-        forecast_for_latest_week = error_percent_latest_week = next_week_prediction = None
+        smape_value = None
+
+    # Predict next week using all available data
+    next_week_prediction = weighted_moving_average(weekly_amounts) if weekly_amounts else None
 
     return jsonify({
-        "forecast_for_latest_week": forecast_for_latest_week,
-        "error_percent_latest_week": error_percent_latest_week,
+        "sMAPE_percent": smape_value,
         "next_week_prediction": next_week_prediction
     })
 
