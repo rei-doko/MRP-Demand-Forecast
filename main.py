@@ -66,6 +66,17 @@ def ensure_database():
         )
     """)
 
+    # Sales table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS sales(
+            product_id INTEGER NOT NULL,
+            week INTEGER NOT NULL,
+            amount INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY (product_id) REFERENCES material_master(product_id) ON DELETE CASCADE,
+            PRIMARY KEY (product_id, week)
+        )
+    """)
+
     connection.commit()
     connection.close()
 
@@ -294,6 +305,119 @@ def delete_bom():
 
     # Redirect back to bom after deletion
     return redirect(url_for("bom"))
+
+@app.route("/sales", methods=["GET", "POST"])
+def sales():
+    connection = sqlite3.connect(db_path)
+    connection.row_factory = sqlite3.Row
+    cursor = connection.cursor()
+
+    message = None
+    selected_product = None
+    sales_data = []
+
+    # Step 1: Handle POST for adding/updating sales
+    if request.method == "POST":
+        try:
+            product_id = int(request.form["product_id"])
+            week = int(request.form["week"])
+            amount = int(request.form["amount"])
+        except (KeyError, ValueError):
+            connection.close()
+            message = "All fields are required and must be valid numbers!"
+            product_id = None
+
+        if product_id is not None:
+            # Check product exists in material master
+            cursor.execute("SELECT * FROM material_master WHERE product_id = ?", (product_id,))
+            product_row = cursor.fetchone()
+            if not product_row:
+                connection.close()
+                message = f"Product ID {product_id} does not exist."
+            else:
+                # Insert or update weekly sales
+                cursor.execute("""
+                    INSERT INTO sales(product_id, week, amount)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(product_id, week) DO UPDATE SET amount=excluded.amount
+                """, (product_id, week, amount))
+                connection.commit()
+                return redirect(url_for("sales", product_id=product_id))
+
+    # Step 2: Handle GET to display selected folder
+    product_id_param = request.args.get("product_id", type=int)
+    if product_id_param:
+        cursor.execute("SELECT * FROM material_master WHERE product_id = ?", (product_id_param,))
+        selected_product = cursor.fetchone()
+        if selected_product:
+            cursor.execute("SELECT week, amount FROM sales WHERE product_id = ? ORDER BY week", (product_id_param,))
+            sales_data = cursor.fetchall()
+
+    # Fetch all products for dropdown
+    cursor.execute("SELECT * FROM material_master ORDER BY product_id")
+    products = cursor.fetchall()
+
+    connection.close()
+
+    return render_template(
+        "sales.html",
+        products=products,
+        selected_product=selected_product,
+        sales_data=sales_data,
+        message=message
+    )
+
+@app.route("/sales/add", methods=["POST"])
+def add_sales():
+    product_id = int(request.form["product_id"])
+    week = int(request.form["week"])
+    amount = int(request.form["amount"])
+
+    connection = sqlite3.connect(db_path)
+    cursor = connection.cursor()
+    cursor.execute("""
+        INSERT INTO sales(product_id, week, amount)
+        VALUES (?, ?, ?)
+        ON CONFLICT(product_id, week) DO UPDATE SET amount=excluded.amount
+    """, (product_id, week, amount))
+    connection.commit()
+    connection.close()
+    return redirect(url_for("sales"))
+
+@app.route("/sales/delete", methods=["POST"])
+def delete_sales():
+    product_id = request.form.get("product_id")
+    delete_weeks = request.form.getlist("delete_weeks[]")
+
+    if not product_id or not delete_weeks:
+        # Redirect back to same folder if nothing selected
+        return redirect(url_for("sales", product_id=product_id))
+
+    connection = sqlite3.connect(db_path)
+    cursor = connection.cursor()
+
+    # Delete selected weeks for this product
+    placeholders = ",".join("?" for _ in delete_weeks)
+    cursor.execute(
+        f"DELETE FROM sales WHERE product_id = ? AND week IN ({placeholders})",
+        [product_id] + delete_weeks
+    )
+
+    connection.commit()
+    connection.close()
+
+    # Redirect to same folder after deletion (GET)
+    return redirect(url_for("sales", product_id=product_id))
+
+# Helper to get all products
+def get_products():
+    connection = sqlite3.connect(db_path)
+    connection.row_factory = sqlite3.Row
+    cursor = connection.cursor()
+    cursor.execute("SELECT * FROM material_master ORDER BY product_id")
+    products = cursor.fetchall()
+    connection.close()
+    return products
 
 # Run Flask
 if __name__ == "__main__":
