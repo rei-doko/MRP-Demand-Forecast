@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Sales Data</h2>
+
+{% if message %}
+<div class="alert alert-danger mt-2" id="msg-box">{{ message }}</div>
+{% endif %}
+
+<!-- Step 1: Select / Open Product Folder -->
+<form method="GET" class="mb-4">
+    <div class="mb-2">
+        <label>Select Product Folder:</label>
+        <select name="product_id" id="product-select" class="form-select" required>
+            <option value="">-- Select Product --</option>
+            {% for product in products %}
+                <option value="{{ product['product_id'] }}" {% if selected_product and selected_product['product_id'] == product['product_id'] %}selected{% endif %}>
+                    Product ID: {{ product['product_id'] }} - {{ product['product_name'] }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Open Folder</button>
+</form>
+
+<hr>
+
+{% if selected_product %}
+<div class="sales-folder mb-3">
+    <h4>Product ID: {{ selected_product['product_id'] }} - {{ selected_product['product_name'] }}</h4>
+
+    <!-- Form to Add / Update Weekly Sales -->
+    <form method="POST" class="mb-3" action="{{ url_for('sales') }}">
+        <input type="hidden" name="product_id" value="{{ selected_product['product_id'] }}">
+        <div class="mb-2">
+            <label>Week</label>
+            <input type="number" name="week" min="1" class="form-control" required>
+        </div>
+        <div class="mb-2">
+            <label>Amount</label>
+            <input type="number" name="amount" min="0" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-success">Update</button>
+    </form>
+
+    <!-- Delete Selected Weeks -->
+    <form method="POST" action="{{ url_for('delete_sales') }}">
+        <input type="hidden" name="product_id" value="{{ selected_product['product_id'] }}">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th style="width:1%"></th>
+                    <th>Week</th>
+                    <th>Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in sales_data %}
+                <tr>
+                    <td><input type="checkbox" name="delete_weeks[]" value="{{ s['week'] }}"></td>
+                    <td>{{ s['week'] }}</td>
+                    <td>{{ s['amount'] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <button type="submit" class="btn btn-danger btn-sm">Delete Selected Weeks</button>
+    </form>
+</div>
+
+<script>
+    // Select all checkbox functionality
+    const selectAll = document.querySelector('.select-all-folder');
+    if(selectAll){
+        selectAll.addEventListener('change', function(){
+            document.querySelectorAll('tbody input[type="checkbox"]').forEach(cb => cb.checked = this.checked);
+        });
+    }
+</script>
+{% endif %}
+
+{% endblock %}
