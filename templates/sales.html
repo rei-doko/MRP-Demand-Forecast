@@ -28,22 +28,32 @@
 <div class="sales-folder mb-3">
     <h4>Product ID: {{ selected_product['product_id'] }} - {{ selected_product['product_name'] }}</h4>
 
-    <!-- Update Week and Sales -->
-    <form method="POST" class="mb-3" action="{{ url_for('sales') }}">
+    <!-- Update Week and Sales + Delete Weeks -->
+    <form method="POST" action="{{ url_for('sales') }}" class="mb-3 d-flex align-items-end gap-2">
         <input type="hidden" name="product_id" value="{{ selected_product['product_id'] }}">
-        <div class="mb-2">
+        <div class="me-2">
             <label>Week</label>
             <input type="number" name="week" min="1" class="form-control" required>
         </div>
-        <div class="mb-2">
+        <div class="me-2">
             <label>Amount</label>
             <input type="number" name="amount" min="0" class="form-control" required>
         </div>
         <button type="submit" class="btn btn-success">Update</button>
     </form>
 
-    <!-- Delete Weeks -->
     <form method="POST" action="{{ url_for('delete_sales') }}" class="mb-3">
+        <input type="hidden" name="product_id" value="{{ selected_product['product_id'] }}">
+        <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
+
+    <!-- Forecast Output -->
+    <div id="forecast-output" class="p-3 border rounded bg-light mb-3">
+        Loading forecast...
+    </div>
+
+    <!-- Sales Table -->
+    <form method="POST" action="{{ url_for('delete_sales') }}">
         <input type="hidden" name="product_id" value="{{ selected_product['product_id'] }}">
         <table class="table table-bordered">
             <thead>
@@ -63,19 +73,13 @@
                 {% endfor %}
             </tbody>
         </table>
-        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
     </form>
-
-    <!-- Forecast Output -->
-    <div id="forecast-output" class="p-3 border rounded bg-light">
-        Loading forecast...
-    </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const forecastDiv = document.getElementById('forecast-output');
-    const productId = ("{{ selected_product['product_id'] }}"); // already works
+    const productId = ("{{ selected_product['product_id'] }}");
 
     fetch(`{{ url_for('sales_forecast') }}?product_id=${productId}`)
         .then(response => response.json())
@@ -83,7 +87,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if(data.error){
                 forecastDiv.innerHTML = data.error;
             } else {
-                // Round next week prediction to whole number
                 const smapeValue = data.sMAPE_percent !== null ? data.sMAPE_percent.toFixed(2) + "%" : "N/A";
                 const nextWeek = data.next_week_prediction !== null ? Math.round(data.next_week_prediction) : "N/A";
 
