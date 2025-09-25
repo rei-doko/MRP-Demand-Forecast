@@ -6,7 +6,7 @@
 <div class="alert alert-danger mt-2" id="msg-box">{{ message }}</div>
 {% endif %}
 
-<!-- Step 1: Select / Open Product Folder -->
+<!-- Select / Open Product Folder -->
 <form method="GET" class="mb-4">
     <div class="mb-2">
         <label>Select Product Folder:</label>
@@ -28,7 +28,7 @@
 <div class="sales-folder mb-3">
     <h4>Product ID: {{ selected_product['product_id'] }} - {{ selected_product['product_name'] }}</h4>
 
-    <!-- Form to Add / Update Weekly Sales -->
+    <!-- Update Week and Sales -->
     <form method="POST" class="mb-3" action="{{ url_for('sales') }}">
         <input type="hidden" name="product_id" value="{{ selected_product['product_id'] }}">
         <div class="mb-2">
@@ -42,8 +42,8 @@
         <button type="submit" class="btn btn-success">Update</button>
     </form>
 
-    <!-- Delete Selected Weeks -->
-    <form method="POST" action="{{ url_for('delete_sales') }}">
+    <!-- Delete Weeks -->
+    <form method="POST" action="{{ url_for('delete_sales') }}" class="mb-3">
         <input type="hidden" name="product_id" value="{{ selected_product['product_id'] }}">
         <table class="table table-bordered">
             <thead>
@@ -54,27 +54,50 @@
                 </tr>
             </thead>
             <tbody>
-                {% for s in sales_data %}
+                {% for sale in weekly_sales %}
                 <tr>
-                    <td><input type="checkbox" name="delete_weeks[]" value="{{ s['week'] }}"></td>
-                    <td>{{ s['week'] }}</td>
-                    <td>{{ s['amount'] }}</td>
+                    <td><input type="checkbox" name="delete_weeks[]" value="{{ sale['week'] }}"></td>
+                    <td>{{ sale['week'] }}</td>
+                    <td>{{ sale['amount'] }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-        <button type="submit" class="btn btn-danger btn-sm">Delete Selected Weeks</button>
+        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
     </form>
+
+    <!-- Forecast Output -->
+    <div id="forecast-output" class="p-3 border rounded bg-light">
+        Loading forecast...
+    </div>
 </div>
 
 <script>
-    // Select all checkbox functionality
-    const selectAll = document.querySelector('.select-all-folder');
-    if(selectAll){
-        selectAll.addEventListener('change', function(){
-            document.querySelectorAll('tbody input[type="checkbox"]').forEach(cb => cb.checked = this.checked);
+document.addEventListener('DOMContentLoaded', function() {
+    const forecastDiv = document.getElementById('forecast-output');
+    const productId = "{{ selected_product['product_id'] }}";  // Keep as string to avoid parse issues
+
+    fetch(`{{ url_for('sales_forecast') }}?product_id=${productId}`)
+        .then(response => response.json())
+        .then(data => {
+            if(data.error){
+                forecastDiv.innerHTML = data.error;
+            } else {
+                forecastDiv.innerHTML = `
+                    <h5>Forecast (Weighted Moving Average)</h5>
+                    <ul>
+                        <li>Predicted latest week: ${data.forecast_for_latest_week !== null ? data.forecast_for_latest_week.toFixed(2) : "N/A"}</li>
+                        <li>Error % latest week: ${data.error_percent_latest_week !== null ? data.error_percent_latest_week.toFixed(2) : "N/A"}%</li>
+                        <li>Next week prediction: ${data.next_week_prediction !== null ? data.next_week_prediction.toFixed(2) : "N/A"}</li>
+                    </ul>
+                `;
+            }
+        })
+        .catch(err => {
+            forecastDiv.innerHTML = "Error fetching forecast";
+            console.error(err);
         });
-    }
+});
 </script>
 {% endif %}
 
