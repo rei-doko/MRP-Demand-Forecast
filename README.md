@@ -18,7 +18,7 @@ Download the zip file in release
 
 ## Features
 - Material master for all products
-- Bill of materials with multiple childen_id for parent_id
+- Bill of materials with multiple childen id for parent id
 - Automatic inventory insertion (default to 0)
 - Update inventory button
 - Sales input
