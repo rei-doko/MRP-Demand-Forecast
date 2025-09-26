@@ -11,8 +11,8 @@ A Python-based MRP application with demand forecasting, with error percentage fo
 Download the zip file in release
 
 # Usage
-1. Enter product_id with product_name in material master
-2. Add inventory ammount
+1. Enter product id with product name in material master
+2. Add inventory amount
 3. Add BOM
 4. Add sales data
 
