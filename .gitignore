@@ -162,5 +162,8 @@ cython_debug/
 # VS Code settings
 .vscode/
 
+# Venv
+venv/
+
 # Ignore database
 data/
