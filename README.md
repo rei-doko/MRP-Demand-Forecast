@@ -1,14 +1,30 @@
-# MRP-Demand-Forecast
-Demand forecast application for volatile database
+# MRP Demand Forecast
+A Python-based MRP application with demand forecasting, with error percentage for analysis, and an automatic item purchase requisition list.
 
-Steps on installing the environment.
+## Table of Contents
+- [Installation](#installation)
+- [Usage](#usage)
+- [Features](#features)
+- [License](#license)
 
-git clone https://github.com/rei-doko/MRP-Demand-Forecast
+## Installation
+Download the zip file in release
 
-cd MRP-Demand-Forecast
+# Usage
+1. Enter product_id with product_name in material master
+2. Add inventory ammount
+3. Add BOM
+4. Add sales data
 
-python -m venv venv
+## Features
+- Material master for all products
+- Bill of materials with multiple childen_id for parent_id
+- Automatic inventory insertion (default to 0)
+- Update inventory button
+- Sales input
+- Demand forecasting using moving weighted average
+- Error percentage using sMAPE
+- Automatic item purchase requisition list
 
-.\venv\Scripts\Activate
-
-pip install -r requirements.txt
+## License
+This project is licensed under the MIT License. See the LICENSE file for details.
