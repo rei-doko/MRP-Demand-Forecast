@@ -136,12 +136,14 @@ def material_master():
 
 @app.route("/materials/delete", methods=["POST"])
 def delete_materials():
+    # Deletes selected materials
     ids_to_delete = request.form.getlist("delete_ids[]")
     if ids_to_delete:
         connection = sqlite3.connect(db_path)
         connection.execute("PRAGMA foreign_keys = ON")
         cursor = connection.cursor()
         
+        # Deletes all selected IDs
         placeholders = ",".join("?" for _ in ids_to_delete)
         cursor.execute(
             f"DELETE FROM material_master WHERE product_id IN ({placeholders})",
@@ -155,6 +157,7 @@ def delete_materials():
 
 @app.route("/inventory", methods=["GET", "POST"])
 def inventory():
+    # View and update inventory levels
     connection = sqlite3.connect(db_path)
     connection.execute("PRAGMA foreign_keys = ON")
     connection.row_factory = sqlite3.Row
@@ -164,6 +167,7 @@ def inventory():
 
     if request.method == "POST":
         updates = {}
+        # Collects updates from form in inventory page
         for key, value in request.form.items():
             if key.startswith("update_quantities["):
                 pid = int(key.split("[")[1].split("]")[0])
@@ -174,6 +178,7 @@ def inventory():
                     continue
                 updates[pid] = qty
 
+        # Applies updates
         for pid, qty in updates.items():
             cursor.execute(
                 "UPDATE inventory SET quantity = ? WHERE product_id = ?",
@@ -188,6 +193,7 @@ def inventory():
             connection.close()
             return redirect(url_for("inventory", message="No valid updates provided."))
 
+    # Displays inventory
     cursor.execute("""
         SELECT i.product_id, m.product_name, i.quantity
         FROM inventory i
@@ -201,6 +207,7 @@ def inventory():
 
 @app.route("/bom", methods=["GET", "POST"])
 def bom():
+    # Creates and displays BOM entries
     connection = sqlite3.connect(db_path)
     connection.execute("PRAGMA foreign_keys = ON")
     connection.row_factory = sqlite3.Row
@@ -211,6 +218,7 @@ def bom():
         child_ids = request.form.getlist("child_id[]")
         quantities = request.form.getlist("quantity_required[]")
         
+        # Validates input value
         if parent_id < 0:
             return "Parent ID cannot be negative", 400
         
@@ -218,9 +226,11 @@ def bom():
             if int(child_id) < 0 or int(qty) < 0:
                 return "Child IDs and quantities cannot be negative", 400
 
+        # Auto-generates BOM ID
         cursor.execute("SELECT COALESCE(MAX(bom_id), 0) + 1 FROM bom")
         new_bom_id = cursor.fetchone()[0]
 
+        # Inserts child record
         for child_id, qty in zip(child_ids, quantities):
             cursor.execute("""
                 INSERT INTO bom(bom_id, parent_product_id, child_product_id, quantity_required)
@@ -232,6 +242,7 @@ def bom():
         connection.close()
         return redirect(url_for("bom"))
 
+    # Displays BOM entries
     bom_rows = cursor.execute("""
         SELECT b.bom_id,
                b.parent_product_id,
@@ -247,6 +258,7 @@ def bom():
 
     connection.close()
 
+    # Groups children under parents
     grouped_bom = {}
     for row in bom_rows:
         bom_key = (row["bom_id"], row["parent_product_id"], row["parent_name"])
@@ -270,13 +282,14 @@ def bom():
 
 @app.route("/bom/delete", methods=["POST"])
 def delete_bom():
+    # Deletes BOM entries
     ids_to_delete = request.form.getlist("delete_ids[]")
     if ids_to_delete:
         connection = sqlite3.connect(db_path)
         connection.execute("PRAGMA foreign_keys = ON")
         cursor = connection.cursor()
 
-        
+        # Deletes selected BOM rows
         placeholders = ",".join("?" for _ in ids_to_delete)
         cursor.execute(
             f"DELETE FROM bom WHERE bom_id IN ({placeholders})",
@@ -288,8 +301,9 @@ def delete_bom():
 
     return redirect(url_for("bom"))
 
-@app.route("/sales", methods=["GET", "POST"])
+@app.route("/sales", methods=["GET"])
 def sales():
+    # Sales display (GET only, no data insert here)
     connection = sqlite3.connect(db_path)
     connection.execute("PRAGMA foreign_keys = ON")
     connection.row_factory = sqlite3.Row
@@ -299,33 +313,7 @@ def sales():
     selected_product = None
     weekly_sales = []
 
-    if request.method == "POST":
-        try:
-            product_id = int(request.form["product_id"])
-            week_number = int(request.form["week"])
-            week_sales_amount = int(request.form["amount"])
-        except (KeyError, ValueError):
-            connection.close()
-            message = "All fields are required and must be valid numbers!"
-            product_id = None
-
-        if product_id is not None:
-            cursor.execute(
-                "SELECT * FROM material_master WHERE product_id = ?", (product_id,)
-            )
-            product_row = cursor.fetchone()
-            if not product_row:
-                message = f"Product ID {product_id} does not exist."
-            else:
-                cursor.execute("""
-                    INSERT INTO sales(product_id, week, amount)
-                    VALUES (?, ?, ?)
-                    ON CONFLICT(product_id, week) DO UPDATE SET amount=excluded.amount
-                """, (product_id, week_number, week_sales_amount))
-                connection.commit()
-                connection.close()
-                return redirect(url_for("sales", product_id=product_id))
-
+    # Fetches product details if a product_id is passed
     selected_product_id = request.args.get("product_id", type=int)
     if selected_product_id:
         cursor.execute(
@@ -333,12 +321,16 @@ def sales():
         )
         selected_product = cursor.fetchone()
         if selected_product:
+            # Retrieves weekly sales history for the selected product
             cursor.execute(
                 "SELECT week, amount FROM sales WHERE product_id = ? ORDER BY week",
                 (selected_product_id,)
             )
             weekly_sales = cursor.fetchall()
+        else:
+            message = f"Product ID {selected_product_id} does not exist."
 
+    # Fetches products for the dropdown menu
     cursor.execute("SELECT * FROM material_master ORDER BY product_id")
     products = cursor.fetchall()
     connection.close()
@@ -353,30 +345,44 @@ def sales():
 
 @app.route("/sales/add", methods=["POST"])
 def add_sales():
-    product_id = int(request.form["product_id"])
-    week = int(request.form["week"])
-    amount = int(request.form["amount"])
+    # Handles adding/updating sales input
+    try:
+        product_id = int(request.form["product_id"])
+        week = int(request.form["week"])
+        amount = int(request.form["amount"])
+    except (KeyError, ValueError):
+        return redirect(url_for("sales", message="All fields must be valid numbers!"))
 
     connection = sqlite3.connect(db_path)
     connection.execute("PRAGMA foreign_keys = ON")
     cursor = connection.cursor()
-    
+
+    # Check if product exists
+    cursor.execute("SELECT * FROM material_master WHERE product_id = ?", (product_id,))
+    product_row = cursor.fetchone()
+    if not product_row:
+        connection.close()
+        return redirect(url_for("sales", message=f"Product ID {product_id} does not exist."))
+
+    # Insert or update sales record
     cursor.execute("""
         INSERT INTO sales(product_id, week, amount)
         VALUES (?, ?, ?)
         ON CONFLICT(product_id, week) DO UPDATE SET amount=excluded.amount
     """, (product_id, week, amount))
-    
+
     connection.commit()
     connection.close()
 
-    return redirect(url_for("sales"))
+    return redirect(url_for("sales", product_id=product_id))
 
 @app.route("/sales/delete", methods=["POST"])
 def delete_sales():
+    # Deletes sales record
     product_id = request.form.get("product_id")
     delete_weeks = request.form.getlist("delete_weeks[]")
 
+    # If no product or week chosen, reload
     if not product_id or not delete_weeks:
         return redirect(url_for("sales", product_id=product_id))
 
@@ -395,6 +401,7 @@ def delete_sales():
 
     return redirect(url_for("sales", product_id=product_id))
 
+# Helps fetch products
 def get_products():
     connection = sqlite3.connect(db_path)
     connection.execute("PRAGMA foreign_keys = ON")
@@ -409,6 +416,7 @@ def get_products():
 
 @app.route("/sales/forecast", methods=["GET"])
 def sales_forecast():
+    # Calculates and return sales forecast
     product_id = request.args.get("product_id", type=int)
     if product_id is None:
         return jsonify({"error": "Missing product_id"}), 400
@@ -418,6 +426,7 @@ def sales_forecast():
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
 
+    # Gets sales history
     cursor.execute(
         "SELECT week, amount FROM sales WHERE product_id = ? ORDER BY week",
         (product_id,)
@@ -427,6 +436,7 @@ def sales_forecast():
 
     connection.close()
 
+    # Forecasting
     def weighted_moving_average(values):
         n = len(values)
         if n == 0:
@@ -435,6 +445,7 @@ def sales_forecast():
         weighted_sum = sum(s * w for s, w in zip(values, weights))
         return weighted_sum / sum(weights)
 
+    # Forecasting error metric
     def smape(actual_values, forecasted_values):
         errors = []
         for actual, forecast in zip(actual_values, forecasted_values):
@@ -444,6 +455,7 @@ def sales_forecast():
             errors.append(abs(actual - forecast) / denominator)
         return (sum(errors) / len(errors) * 100) if errors else None
 
+    # Generates forecasted value for each week except the first (for error metric)
     forecasted_values = []
     if len(weekly_amounts) > 1:
         for i in range(1, len(weekly_amounts)):
@@ -452,8 +464,10 @@ def sales_forecast():
     else:
         smape_value = None
 
+    # Predicts next week's sales
     next_week_prediction = weighted_moving_average(weekly_amounts) if weekly_amounts else None
 
+    # Returns results as JSON
     return jsonify({
         "sMAPE_percent": smape_value,
         "next_week_prediction": next_week_prediction
@@ -461,6 +475,7 @@ def sales_forecast():
 
 @app.route("/requisition", methods=["GET", "POST"])
 def requisition():
+    # Checks inventory stock and children requirements
     requisition_list = None
     bom_id = None
     qty_needed = None
@@ -487,9 +502,8 @@ def requisition():
             connection.close()
             return render_template("requisition.html", error=error)
 
-        parent_id = row["parent_product_id"]
-
         # Get parent product name
+        parent_id = row["parent_product_id"]
         cursor.execute("SELECT product_name FROM material_master WHERE product_id = ?", (parent_id,))
         parent_name = cursor.fetchone()["product_name"]
 
@@ -498,6 +512,7 @@ def requisition():
         inv_row = cursor.fetchone()
         parent_inventory = inv_row["quantity"] if inv_row else 0
 
+        # Check if enough parent stock exists
         if parent_inventory >= qty_needed:
             parent_status = f"No need to repurchase. {parent_name} inventory ({parent_inventory}) covers the requirement of {qty_needed}."
             requisition_list = []
