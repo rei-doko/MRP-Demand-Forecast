@@ -1,4 +1,4 @@
-# MRP Demand Forecast
+# FLux
 A Python-based MRP application with demand forecasting, with error percentage for analysis, and an automatic item purchase requisition list.
 
 ## Table of Contents
