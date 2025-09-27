@@ -1,7 +1,7 @@
-# Import dependencies and libraries
+# Dependencies
 from flask import Flask, render_template, Response, jsonify, request, redirect, url_for
 from datetime import datetime
-import flaskwebgui  # GUI mode
+import flaskwebgui
 import sqlite3
 import os
 
@@ -17,7 +17,7 @@ db_path = os.path.join(db_folder, "database.db")
 
 @app.route("/")
 def index():
-    # Renders homepage
+    # Render homepage
     return render_template("index.html")
 
 def ensure_database():
@@ -30,7 +30,6 @@ def ensure_database():
     # Connect and ensure tables exist
     connection = sqlite3.connect(db_path)
     cursor = connection.cursor()
-
     cursor.execute("PRAGMA foreign_keys = ON")
 
     # Material master table
@@ -459,6 +458,94 @@ def sales_forecast():
         "sMAPE_percent": smape_value,
         "next_week_prediction": next_week_prediction
     })
+
+@app.route("/requisition", methods=["GET", "POST"])
+def requisition():
+    requisition_list = None
+    bom_id = None
+    qty_needed = None
+    parent_status = None
+    parent_shortage = 0
+    parent_name = None
+    parent_inventory = 0
+    error = None
+
+    if request.method == "POST":
+        bom_id = int(request.form["bom_id"])
+        qty_needed = int(request.form["quantity_needed"])
+
+        connection = sqlite3.connect(db_path)
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.row_factory = sqlite3.Row
+        cursor = connection.cursor()
+
+        # Check if BOM ID exists first
+        cursor.execute("SELECT parent_product_id FROM bom WHERE bom_id = ? LIMIT 1", (bom_id,))
+        row = cursor.fetchone()
+        if not row:
+            error = f"BOM ID {bom_id} does not exist."
+            connection.close()
+            return render_template("requisition.html", error=error)
+
+        parent_id = row["parent_product_id"]
+
+        # Get parent product name
+        cursor.execute("SELECT product_name FROM material_master WHERE product_id = ?", (parent_id,))
+        parent_name = cursor.fetchone()["product_name"]
+
+        # Get parent inventory
+        cursor.execute("SELECT quantity FROM inventory WHERE product_id = ?", (parent_id,))
+        inv_row = cursor.fetchone()
+        parent_inventory = inv_row["quantity"] if inv_row else 0
+
+        if parent_inventory >= qty_needed:
+            parent_status = f"No need to repurchase. {parent_name} inventory ({parent_inventory}) covers the requirement of {qty_needed}."
+            requisition_list = []
+        else:
+            parent_shortage = qty_needed - parent_inventory
+            parent_status = f"{parent_name}: Need {qty_needed}, but only {parent_inventory} in inventory. Must create {parent_shortage} more."
+
+            # Get all child components
+            cursor.execute("""
+                SELECT b.child_product_id, b.quantity_required, m.product_name
+                FROM bom b
+                JOIN material_master m ON b.child_product_id = m.product_id
+                WHERE b.bom_id = ?
+            """, (bom_id,))
+            children = cursor.fetchall()
+
+            requisition_list = []
+            for child in children:
+                child_id = child["child_product_id"]
+                child_name = child["product_name"]
+                required_per_unit = child["quantity_required"]
+                total_required = required_per_unit * parent_shortage
+
+                cursor.execute("SELECT quantity FROM inventory WHERE product_id = ?", (child_id,))
+                inv_row = cursor.fetchone()
+                inventory_amt = inv_row["quantity"] if inv_row else 0
+
+                shortage = max(0, total_required - inventory_amt)
+
+                requisition_list.append({
+                    "child_id": child_id,
+                    "child_name": child_name,
+                    "required": total_required,
+                    "inventory": inventory_amt,
+                    "shortage": shortage
+                })
+
+        connection.close()
+
+    return render_template("requisition.html",
+                           requisition_list=requisition_list,
+                           bom_id=bom_id,
+                           qty_needed=qty_needed,
+                           parent_status=parent_status,
+                           parent_shortage=parent_shortage,
+                           parent_name=parent_name,
+                           parent_inventory=parent_inventory,
+                           error=error)
 
 if __name__ == "__main__":
     USE_GUI = False
