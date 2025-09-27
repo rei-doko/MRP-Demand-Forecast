@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Sales Requisition</h2>
+
+<!-- Form for entering BOM ID and quantity needed -->
+<form method="POST" class="mb-4">
+  <div class="mb-3">
+    <!-- BOM ID input -->
+    <label for="bom_id" class="form-label">BOM ID</label>
+    <input type="number" name="bom_id" class="form-control" required>
+  </div>
+  <div class="mb-3">
+    <!-- Quantity input -->
+    <label for="quantity_needed" class="form-label">Quantity Needed</label>
+    <input type="number" name="quantity_needed" class="form-control" required>
+  </div>
+  <!-- Button to create requisition -->
+  <button type="submit" class="btn btn-primary">Generate</button>
+</form>
+
+<!-- Dipslays error message -->
+{% if error %}
+  <div class="alert alert-danger">
+    {{ error }}
+  </div>
+{% endif %}
+
+<!-- Status for parent id status -->
+{% if parent_status %}
+  <div class="alert alert-info">
+    {{ parent_status }}
+  </div>
+{% endif %}
+
+<!-- Displays requisition list -->
+{% if requisition_list is not none %}
+  {% if requisition_list|length > 0 %}
+    <h4>
+      Parent Product: {{ parent_name }}  
+      (Inventory: {{ parent_inventory }} | Needed: {{ qty_needed }} | Shortage: {{ parent_shortage }})
+    </h4>
+    <!-- Child product details -->
+    <table class="table table-bordered">
+      <thead>
+        <tr>
+          <th>Child Product</th>
+          <th>Total Required</th>
+          <th>Inventory</th>
+          <th>Shortage</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Loops through each child product in the requisition list -->
+        {% for row in requisition_list %}
+        <tr>
+          <td>{{ row.child_name }} (ID: {{ row.child_id }})</td>
+          <td>{{ row.required }}</td>
+          <td>{{ row.inventory }}</td>
+          <!-- Shortage column -->
+          <td class="{% if row.shortage > 0 %}table-danger{% else %}table-success{% endif %}">
+            {% if row.shortage > 0 %}
+              {{ row.shortage }}
+            {% else %}
+              No need to repurchase
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+  <!-- Alert if no child components are needed -->
+    <div class="alert alert-success">
+      No child components need to be repurchased.
+    </div>
+  {% endif %}
+{% endif %}
+{% endblock %}
