@@ -9,6 +9,7 @@
 
 <!-- Centralized Update Form -->
 <form method="POST" action="{{ url_for('inventory') }}">
+    <!-- Table for inventory -->
     <table class="table table-bordered">
         <thead>
             <tr>
@@ -16,11 +17,13 @@
                 <th>Product Name</th>
                 <th>Current Quantity</th>
                 <th>
+                    <!-- Button to update quantities -->
                     <button type="submit" class="btn btn-success btn-sm mt-1">Update</button>
                 </th>
             </tr>
         </thead>
         <tbody>
+            <!-- Loops through each item in inventory -->
             {% for item in inventory %}
             <tr>
                 <td>{{ item['product_id'] }}</td>
@@ -49,4 +52,5 @@
         }
     });
 </script>
+
 {% endblock %}

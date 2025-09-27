@@ -2,6 +2,7 @@
 {% block content %}
 <h2>Sales Data</h2>
 
+<!-- Displays error message -->
 {% if message %}
 <div class="alert alert-danger mt-2" id="msg-box">{{ message }}</div>
 {% endif %}
@@ -10,41 +11,44 @@
 <form method="GET" class="mb-4">
     <div class="mb-2">
         <label>Select Product Folder:</label>
+        <!-- Dropdown to choose product -->
         <select name="product_id" id="product-select" class="form-select" required>
             <option value="">-- Select Product --</option>
+            <!-- Loops through all products -->
             {% for product in products %}
-                <option value="{{ product['product_id'] }}" {% if selected_product and selected_product['product_id'] == product['product_id'] %}selected{% endif %}>
+            <!-- If product folder is selected, keep it selected -->
+            <option value="{{ product['product_id'] }}" {% if selected_product and selected_product['product_id'] == product['product_id'] %}selected{% endif %}>
                     Product ID: {{ product['product_id'] }} - {{ product['product_name'] }}
                 </option>
             {% endfor %}
         </select>
     </div>
+    <!-- Button to load data product folder -->
     <button type="submit" class="btn btn-primary">Open Folder</button>
 </form>
 
 <hr>
 
+<!-- Show product details if selected -->
 {% if selected_product %}
 <div class="sales-folder mb-3">
     <h4>Product ID: {{ selected_product['product_id'] }} - {{ selected_product['product_name'] }}</h4>
 
-    <!-- Update Week and Sales + Delete Weeks -->
-    <form method="POST" action="{{ url_for('sales') }}" class="mb-3 d-flex align-items-end gap-2">
+    <!-- Update Week and Sales -->
+    <form method="POST" action="{{ url_for('add_sales') }}" class="mb-3 d-flex align-items-end gap-2">
         <input type="hidden" name="product_id" value="{{ selected_product['product_id'] }}">
         <div class="me-2">
+            <!-- Input for week -->
             <label>Week</label>
             <input type="number" name="week" min="1" class="form-control" required>
         </div>
         <div class="me-2">
+            <!-- Input for amount -->
             <label>Amount</label>
             <input type="number" name="amount" min="0" class="form-control" required>
         </div>
+        <!-- Submit button -->
         <button type="submit" class="btn btn-success">Update</button>
-    </form>
-
-    <form method="POST" action="{{ url_for('delete_sales') }}" class="mb-3">
-        <input type="hidden" name="product_id" value="{{ selected_product['product_id'] }}">
-        <button type="submit" class="btn btn-danger">Delete</button>
     </form>
 
     <!-- Forecast Output -->
@@ -66,6 +70,7 @@
             <tbody>
                 {% for sale in weekly_sales %}
                 <tr>
+                    <!-- Checkbox for deletion -->
                     <td><input type="checkbox" name="delete_weeks[]" value="{{ sale['week'] }}"></td>
                     <td>{{ sale['week'] }}</td>
                     <td>{{ sale['amount'] }}</td>
@@ -73,6 +78,8 @@
                 {% endfor %}
             </tbody>
         </table>
+        <!-- Deletes row -->
+        <button type="submit" class="btn btn-danger">Delete Selected</button>
     </form>
 </div>
 
@@ -81,15 +88,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const forecastDiv = document.getElementById('forecast-output');
     const productId = ("{{ selected_product['product_id'] }}");
 
+    // Fetches forecast data for the selected product
     fetch(`{{ url_for('sales_forecast') }}?product_id=${productId}`)
         .then(response => response.json())
         .then(data => {
+            // Error message if forecast fails
             if(data.error){
                 forecastDiv.innerHTML = data.error;
             } else {
+                // Formats values (rounded to nearest whole number)
                 const smapeValue = data.sMAPE_percent !== null ? data.sMAPE_percent.toFixed(2) + "%" : "N/A";
                 const nextWeek = data.next_week_prediction !== null ? Math.round(data.next_week_prediction) : "N/A";
 
+                // Displays forecast results
                 forecastDiv.innerHTML = `
                     <h5>Forecast (Weighted Moving Average)</h5>
                     <ul>
@@ -100,6 +111,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         })
         .catch(err => {
+            // Error message if fetch fails
             forecastDiv.innerHTML = "Error fetching forecast";
             console.error(err);
         });
