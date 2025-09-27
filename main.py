@@ -548,7 +548,7 @@ def requisition():
                            error=error)
 
 if __name__ == "__main__":
-    USE_GUI = False
+    USE_GUI = True
     if USE_GUI:
         gui.run()
     else:
